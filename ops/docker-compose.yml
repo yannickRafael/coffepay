@@ -1,0 +1,42 @@
+name: coffepay
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: coffepay-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coffepay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coffepay}
+      POSTGRES_DB: ${POSTGRES_DB:-coffepay}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-coffepay} -d ${POSTGRES_DB:-coffepay}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: coffepay-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+# Microservices + mockstore + ngrok are wired into this compose in T35.
+# Until then, services run locally (npm run dev) against these datastores.
+
+volumes:
+  postgres-data:
+  redis-data:

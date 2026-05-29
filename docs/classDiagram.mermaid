@@ -1,0 +1,157 @@
+classDiagram
+    class Session {
+        -UUID sessionId
+        -UUID merchantId
+        -String orderId
+        -Decimal amountUSD
+        -Decimal amountMZN
+        -String callbackUrl
+        -SessionStatus status
+        -DateTime createdAt
+        -DateTime expiresAt
+        +create() Session
+        +expire() void
+    }
+
+    class Payment {
+        -UUID paymentId
+        -UUID sessionId
+        -UUID clientId
+        -String idempotencyKey
+        -PaymentStatus status
+        -Integer attempts
+        -DateTime initiatedAt
+        -DateTime completedAt
+        +initiate() void
+        +cancel() void
+    }
+
+    class Client {
+        -UUID clientId
+        -String phoneHash
+        -DateTime createdAt
+        +getProfile() KYCProfile
+    }
+
+    class Transaction {
+        -UUID transactionId
+        -UUID paymentId
+        -Decimal amountMZN
+        -TransactionStatus status
+        -DateTime processedAt
+        -DateTime confirmedAt
+        +confirm() void
+        +fail() void
+    }
+
+    class Merchant {
+        -UUID merchantId
+        -String name
+        -String nuit
+        -MerchantStatus status
+        -DateTime createdAt
+        +authenticate() Boolean
+    }
+
+    class ApiKey {
+        -UUID keyId
+        -UUID merchantId
+        -String type
+        -String keyHash
+        -Boolean isActive
+        +validate() Boolean
+        +revoke() void
+    }
+
+    class KYCProfile {
+        -UUID profileId
+        -UUID clientId
+        -RiskLevel riskLevel
+        -Boolean isBlacklisted
+        -Integer transactionCount
+        -DateTime lastValidatedAt
+        +validate() ValidationResult
+        +updateRisk() void
+    }
+
+    class FXRate {
+        -UUID rateId
+        -String fromCurrency
+        -String toCurrency
+        -Decimal rate
+        -Decimal serviceFee
+        -DateTime fetchedAt
+        -DateTime expiresAt
+        +convert(amount) Decimal
+        +refresh() void
+    }
+
+    class ProviderRequest {
+        -UUID requestId
+        -UUID transactionId
+        -String provider
+        -JSON requestPayload
+        -JSON responsePayload
+        -Integer httpStatus
+        -DateTime createdAt
+        +send() void
+        +verify() Boolean
+    }
+
+    class LedgerEntry {
+        -UUID entryId
+        -UUID transactionId
+        -String entryType
+        -Decimal amount
+        -Decimal balanceAfter
+        -String description
+        -DateTime createdAt
+        +record() void
+    }
+
+    class Webhook {
+        -UUID webhookId
+        -UUID merchantId
+        -String url
+        -String events
+        -Boolean isActive
+        +dispatch() void
+        +retry() void
+    }
+
+    class IdempotencyKey {
+        -UUID keyId
+        -String key
+        -UUID paymentId
+        -JSON result
+        -DateTime createdAt
+        -DateTime expiresAt
+        +isDuplicate() Boolean
+        +storeResult() void
+    }
+
+    class AuditLog {
+        -UUID logId
+        -UUID actorId
+        -String action
+        -String entityType
+        -UUID entityId
+        -JSON changes
+        -DateTime createdAt
+        +record() void
+        +query() List
+    }
+
+    Merchant "1" --> "*" Session : cria
+    Merchant "1" --> "*" ApiKey : possui
+    Merchant "1" --> "*" Webhook : regista
+    Session "1" --> "1" Payment : inicia
+    Session "1" --> "1" FXRate : usa
+    Payment "1" --> "1" Client : pertence a
+    Payment "1" --> "1" Transaction : gera
+    Payment "1" --> "1" IdempotencyKey : associa
+    Payment "1" --> "1" KYCProfile : valida
+    Client "1" --> "1" KYCProfile : tem
+    Transaction "1" --> "*" ProviderRequest : regista
+    Transaction "1" --> "*" LedgerEntry : gera
+    Transaction "1" --> "*" AuditLog : audita

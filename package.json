@@ -18,7 +18,16 @@
     "lint:fix": "eslint . --fix --no-error-on-unmatched-pattern",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "prisma generate --schema=packages/shared/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=packages/shared/prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema=packages/shared/prisma/schema.prisma",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --schema=packages/shared/prisma/schema.prisma",
+    "db:studio": "prisma studio --schema=packages/shared/prisma/schema.prisma"
+  },
+  "prisma": {
+    "seed": "tsx packages/shared/prisma/seed.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

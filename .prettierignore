@@ -5,3 +5,7 @@ coverage
 *.tsbuildinfo
 package-lock.json
 prisma/migrations
+
+# Author-provided design docs — left as written
+docs/classDiagram.mermaid
+docs/classDiagramExplanation.md

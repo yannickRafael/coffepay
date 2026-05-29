@@ -1,0 +1,257 @@
+// CoffePay — data model.
+// Source of truth: docs/classDiagram.mermaid + docs/classDiagramExplanation.md (thesis fig 26).
+// Pragmatic relational adaptations (decided 2026-05-29), documented in ADR (T06):
+//   - Client 1->* Payment (a client may pay many times); Client 1->1 KYCProfile.
+//   - No direct Payment->KYCProfile FK; reached via Payment.client.kycProfile.
+//   - AuditLog is polymorphic/global (entityType+entityId), transactionId optional, to cover the whole flow (RNF07/T36).
+//   - updatedAt added to mutable entities (additive vs diagram).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------- Enums -----------------------------
+
+enum MerchantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SessionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum TransactionStatus {
+  SUCCESS
+  FAILED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ----------------------------- Models ----------------------------
+
+model Merchant {
+  id        String         @id @default(uuid()) @db.Uuid
+  name      String
+  nuit      String         @unique
+  status    MerchantStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  sessions Session[]
+  apiKeys  ApiKey[]
+  webhooks Webhook[]
+
+  @@map("merchants")
+}
+
+model ApiKey {
+  id         String   @id @default(uuid()) @db.Uuid
+  merchantId String   @db.Uuid
+  type       String // PROD | DEV
+  keyHash    String // bcrypt hash; never store the raw key
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@map("api_keys")
+}
+
+model Webhook {
+  id         String   @id @default(uuid()) @db.Uuid
+  merchantId String   @db.Uuid
+  url        String
+  events     String // CSV of subscribed events, e.g. "payment.success,payment.failed"
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@map("webhooks")
+}
+
+model Session {
+  id          String        @id @default(uuid()) @db.Uuid
+  merchantId  String        @db.Uuid
+  orderId     String
+  amountUSD   Decimal       @db.Decimal(18, 2)
+  amountMZN   Decimal       @db.Decimal(18, 2)
+  callbackUrl String
+  status      SessionStatus @default(PENDING)
+  fxRateId    String?       @unique @db.Uuid
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  expiresAt   DateTime
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  fxRate   FXRate?  @relation(fields: [fxRateId], references: [id])
+  payment  Payment?
+
+  @@index([merchantId])
+  @@index([status])
+  @@map("sessions")
+}
+
+model FXRate {
+  id           String   @id @default(uuid()) @db.Uuid
+  fromCurrency String // USD
+  toCurrency   String // MZN
+  rate         Decimal  @db.Decimal(18, 6)
+  serviceFee   Decimal  @db.Decimal(18, 2)
+  fetchedAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  session Session?
+
+  @@map("fx_rates")
+}
+
+model Client {
+  id        String   @id @default(uuid()) @db.Uuid
+  phoneHash String   @unique // hash of the MSISDN; never store the raw number
+  createdAt DateTime @default(now())
+
+  payments   Payment[]
+  kycProfile KYCProfile?
+
+  @@map("clients")
+}
+
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  sessionId      String        @unique @db.Uuid
+  clientId       String        @db.Uuid
+  idempotencyKey String
+  status         PaymentStatus @default(INITIATED)
+  attempts       Int           @default(0)
+  initiatedAt    DateTime      @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime      @updatedAt
+
+  session       Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  client        Client          @relation(fields: [clientId], references: [id])
+  transaction   Transaction?
+  idempotency   IdempotencyKey?
+
+  @@index([clientId])
+  @@index([status])
+  @@map("payments")
+}
+
+model KYCProfile {
+  id               String    @id @default(uuid()) @db.Uuid
+  clientId         String    @unique @db.Uuid
+  riskLevel        RiskLevel @default(LOW)
+  isBlacklisted    Boolean   @default(false)
+  transactionCount Int       @default(0)
+  lastValidatedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_profiles")
+}
+
+model IdempotencyKey {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  paymentId String   @unique @db.Uuid
+  result    Json?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("idempotency_keys")
+}
+
+model Transaction {
+  id          String            @id @default(uuid()) @db.Uuid
+  paymentId   String            @unique @db.Uuid
+  amountMZN   Decimal           @db.Decimal(18, 2)
+  status      TransactionStatus
+  processedAt DateTime?
+  confirmedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  payment          Payment           @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  providerRequests ProviderRequest[]
+  ledgerEntries    LedgerEntry[]
+  auditLogs        AuditLog[]
+
+  @@map("transactions")
+}
+
+model ProviderRequest {
+  id              String   @id @default(uuid()) @db.Uuid
+  transactionId   String   @db.Uuid
+  provider        String // MPESA
+  requestPayload  Json
+  responsePayload Json?
+  httpStatus      Int?
+  createdAt       DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("provider_requests")
+}
+
+model LedgerEntry {
+  id            String   @id @default(uuid()) @db.Uuid
+  transactionId String   @db.Uuid
+  entryType     String // CREDIT | DEBIT
+  amount        Decimal  @db.Decimal(18, 2)
+  balanceAfter  Decimal  @db.Decimal(18, 2)
+  description   String
+  createdAt     DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorId       String?  @db.Uuid // user, system or admin
+  action        String // SESSION_CREATED, PAYMENT_INITIATED, KYC_VALIDATED, ...
+  entityType    String // Session, Payment, Transaction, ...
+  entityId      String   @db.Uuid
+  changes       Json? // before/after snapshot
+  transactionId String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([transactionId])
+  @@map("audit_logs")
+}

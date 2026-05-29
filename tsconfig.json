@@ -1,4 +1,15 @@
 {
   "extends": "./tsconfig.base.json",
-  "files": []
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./services/api-gateway" },
+    { "path": "./services/session-service" },
+    { "path": "./services/payment-service" },
+    { "path": "./services/callback-service" },
+    { "path": "./services/kyc-service" },
+    { "path": "./services/fx-service" },
+    { "path": "./services/notification-service" },
+    { "path": "./mockstore" }
+  ]
 }

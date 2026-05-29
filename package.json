@@ -11,13 +11,14 @@
     "mockstore"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "tsc -b",
+    "clean": "tsc -b --clean && npm run clean --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint . --no-error-on-unmatched-pattern",
     "lint:fix": "eslint . --fix --no-error-on-unmatched-pattern",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -25,6 +26,7 @@
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1"
   },

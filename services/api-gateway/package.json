@@ -1,0 +1,19 @@
+{
+  "name": "@coffepay/api-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "test": "echo \"no tests yet (@coffepay/api-gateway)\" && exit 0",
+    "lint": "eslint src --no-error-on-unmatched-pattern",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@coffepay/shared": "*"
+  }
+}

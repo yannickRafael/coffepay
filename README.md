@@ -10,15 +10,15 @@ Autor: Yannick Rafael Alberto Matimbe.
 
 Monorepo (npm workspaces) com microserviços:
 
-| Serviço | Função |
-|---------|--------|
-| `api-gateway` | Ponto de entrada: auth, rate-limiting, routing, TLS termination |
-| `session-service` | Cria e gere sessões de pagamento; conversão cambial via FX |
-| `payment-service` | Checkout, idempotência, iniciação de pagamento via M-Pesa |
-| `callback-service` | Processa resultado do M-Pesa, ledger e auditoria |
-| `kyc-service` | Validação KYC/AML (activa e passiva) |
-| `fx-service` | Conversão cambial MZN↔USD em tempo real |
-| `notification-service` | Webhooks assinados para o merchant, retry e DLQ |
+| Serviço                | Função                                                          |
+| ---------------------- | --------------------------------------------------------------- |
+| `api-gateway`          | Ponto de entrada: auth, rate-limiting, routing, TLS termination |
+| `session-service`      | Cria e gere sessões de pagamento; conversão cambial via FX      |
+| `payment-service`      | Checkout, idempotência, iniciação de pagamento via M-Pesa       |
+| `callback-service`     | Processa resultado do M-Pesa, ledger e auditoria                |
+| `kyc-service`          | Validação KYC/AML (activa e passiva)                            |
+| `fx-service`           | Conversão cambial MZN↔USD em tempo real                         |
+| `notification-service` | Webhooks assinados para o merchant, retry e DLQ                 |
 
 Pastas adicionais:
 

@@ -72,7 +72,12 @@ export async function quote(
   amountUSD: string | number,
   cfg: FxConfig = fxConfig(),
 ): Promise<Quote> {
-  const amount = new Decimal(amountUSD);
+  let amount: InstanceType<typeof Decimal>;
+  try {
+    amount = new Decimal(amountUSD);
+  } catch {
+    throw new ValidationError('amount must be a number', { amount: String(amountUSD) });
+  }
   if (!amount.isFinite() || amount.lte(0)) {
     throw new ValidationError('amount must be a positive number', { amount: String(amountUSD) });
   }

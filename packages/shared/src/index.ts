@@ -23,3 +23,6 @@ export {
   type SignedWebhook,
   type VerifyOptions,
 } from './crypto/hmac.js';
+
+// BullMQ queues, DLQ and worker factory.
+export * from './queue/index.js';

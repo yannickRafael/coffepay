@@ -1,3 +1,10 @@
-const PORT = Number(process.env.PORT ?? 3000);
+import { createLogger } from '@coffepay/shared';
+import { createApp } from './app.js';
+import { gatewayConfig } from './config.js';
 
-console.log(`[api-gateway] stub ready (port ${PORT})`);
+const log = createLogger({ service: 'api-gateway' });
+const cfg = gatewayConfig();
+
+createApp(cfg).listen(cfg.API_GATEWAY_PORT, () => {
+  log.info(`[api-gateway] listening on port ${cfg.API_GATEWAY_PORT}`);
+});

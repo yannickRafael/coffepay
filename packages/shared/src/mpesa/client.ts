@@ -51,14 +51,18 @@ function toAppError(err: unknown, op: string): never {
     if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
       throw new TimeoutError(`M-Pesa ${op} timed out`);
     }
+    // err.response present => HTTP error; absent => network/TLS error.
     throw new ProviderError(`M-Pesa ${op} failed`, {
       status: err.response?.status,
+      netCode: err.code, // ENOTFOUND, ECONNREFUSED, EPROTO, DEPTH_ZERO_SELF_SIGNED_CERT…
+      reason: err.message,
+      cause: (err.cause as { code?: string } | undefined)?.code,
       code: err.response?.data?.output_ResponseCode,
       desc: err.response?.data?.output_ResponseDesc ?? err.response?.data?.fault?.faultstring,
       body: err.response?.data,
     });
   }
-  throw new ProviderError(`M-Pesa ${op} failed`);
+  throw new ProviderError(`M-Pesa ${op} failed`, { reason: (err as Error)?.message });
 }
 
 function headers(cfg: MpesaEnv) {

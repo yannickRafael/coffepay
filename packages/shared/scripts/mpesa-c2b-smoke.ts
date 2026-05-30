@@ -9,9 +9,10 @@
  *
  * Without args it uses MPESA_TEST_AMOUNT / MPESA_TEST_MSISDN from .env.
  */
-import { c2bPayment, loadMpesaConfig, isMockMode } from '../src/index.js';
+import { c2bPayment, loadMpesaConfig, isMockMode, mpesaUrl } from '../src/index.js';
 
 const cfg = loadMpesaConfig();
+console.log('c2b url  :', mpesaUrl(cfg, 'c2b'));
 const amount = process.argv[2] ?? process.env.MPESA_TEST_AMOUNT ?? '10';
 const msisdn = process.argv[3] ?? process.env.MPESA_TEST_MSISDN ?? '';
 const reference = `T${Date.now().toString().slice(-9)}`;

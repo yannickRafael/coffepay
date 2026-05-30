@@ -20,7 +20,15 @@ const PATHS = {
 
 export type MpesaOperation = keyof typeof MPESA_PORTS;
 
+/** Strip any scheme, port or trailing slash a user may have put in MPESA_API_HOST. */
+function cleanHost(host: string): string {
+  return host
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/[/:].*$/, '');
+}
+
 /** Build the full URL for an operation, e.g. https://host:18352/ipg/v1x/c2bPayment/singleStage/ */
 export function mpesaUrl(cfg: MpesaEnv, op: MpesaOperation): string {
-  return `https://${cfg.MPESA_API_HOST}:${MPESA_PORTS[op]}${PATHS[op]}`;
+  return `https://${cleanHost(cfg.MPESA_API_HOST)}:${MPESA_PORTS[op]}${PATHS[op]}`;
 }

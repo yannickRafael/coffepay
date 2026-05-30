@@ -7,6 +7,9 @@ const gatewayEnvSchema = baseEnvSchema.extend({
   CORS_ORIGIN: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  JWT_EXPIRES_IN: z.string().default('15m'),
+  MERCHANT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  MERCHANT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
 });
 
 export type GatewayConfig = z.infer<typeof gatewayEnvSchema>;

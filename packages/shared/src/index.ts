@@ -24,5 +24,8 @@ export {
   type VerifyOptions,
 } from './crypto/hmac.js';
 
+// Password / secret hashing (bcrypt).
+export { hashSecret, verifySecret } from './crypto/password.js';
+
 // BullMQ queues, DLQ and worker factory.
 export * from './queue/index.js';

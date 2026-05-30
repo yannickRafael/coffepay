@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import { requestId } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createRateLimiter } from './middleware/rateLimit.js';
+import { buildAuthRouter } from './auth.routes.js';
 import { gatewayConfig, type GatewayConfig } from './config.js';
 
 export function createApp(cfg: GatewayConfig = gatewayConfig()) {
@@ -18,8 +19,9 @@ export function createApp(cfg: GatewayConfig = gatewayConfig()) {
 
   app.use(createRateLimiter({ windowMs: cfg.RATE_LIMIT_WINDOW_MS, max: cfg.RATE_LIMIT_MAX }));
 
-  // API v1. Auth (T14) and business routes (sessions T15, pay T20) mount here.
+  // API v1. Business routes (sessions T15, pay T20) mount here too.
   const v1 = express.Router();
+  v1.use('/auth', buildAuthRouter());
   app.use('/api/v1', v1);
 
   app.use(errorHandler);

@@ -10,6 +10,8 @@ declare global {
     interface Request {
       id: string;
       log: ReqLogger;
+      merchantId?: string;
+      apiKeyId?: string;
     }
   }
 }

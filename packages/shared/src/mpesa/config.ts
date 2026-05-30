@@ -14,6 +14,9 @@ export const mpesaEnvSchema = z.object({
   MPESA_ORIGIN: z.string().default('developer.mpesa.vm.co.mz'),
   MPESA_SERVICE_PROVIDER_CODE: z.string().default('171717'),
   MPESA_CURRENCY: z.string().default('MZN'),
+  // Required only for reversals (provided by Vodacom MZ).
+  MPESA_INITIATOR_IDENTIFIER: z.string().optional(),
+  MPESA_SECURITY_CREDENTIAL: z.string().optional(),
   MPESA_MOCK: z
     .enum(['true', 'false'])
     .optional()

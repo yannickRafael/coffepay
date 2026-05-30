@@ -25,7 +25,8 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --schema=packages/shared/prisma/schema.prisma",
     "db:studio": "prisma studio --schema=packages/shared/prisma/schema.prisma",
-    "mpesa:smoke": "tsx --env-file=.env packages/shared/scripts/mpesa-session-smoke.ts"
+    "mpesa:smoke": "tsx --env-file=.env packages/shared/scripts/mpesa-session-smoke.ts",
+    "mpesa:c2b": "tsx --env-file=.env packages/shared/scripts/mpesa-c2b-smoke.ts"
   },
   "prisma": {
     "seed": "tsx packages/shared/prisma/seed.ts"

@@ -5,15 +5,19 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
     "build": "tsc -b",
-    "start": "node dist/index.js",
+    "start": "node --env-file=../../.env dist/index.js",
     "test": "echo \"no tests yet (@coffepay/fx-service)\" && exit 0",
     "lint": "eslint src --no-error-on-unmatched-pattern",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@coffepay/shared": "*"
+    "@coffepay/shared": "*",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21"
   }
 }

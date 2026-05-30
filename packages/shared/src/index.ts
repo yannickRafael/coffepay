@@ -13,3 +13,13 @@ export { redis } from './redis.js';
 
 // M-Pesa (Vodacom OpenAPI) client.
 export * from './mpesa/index.js';
+
+// Webhook HMAC signing/verification.
+export {
+  signPayload,
+  verifySignature,
+  parseSignatureHeader,
+  SIGNATURE_HEADER,
+  type SignedWebhook,
+  type VerifyOptions,
+} from './crypto/hmac.js';

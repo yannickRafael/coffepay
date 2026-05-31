@@ -3,6 +3,8 @@ import helmet from 'helmet';
 import { requestId } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createRateLimiter } from './middleware/rateLimit.js';
+import { apiKeyAuth } from './middleware/apiKeyAuth.js';
+import { forward } from './middleware/forward.js';
 import { buildAuthRouter } from './auth.routes.js';
 import { gatewayConfig, type GatewayConfig } from './config.js';
 
@@ -19,9 +21,17 @@ export function createApp(cfg: GatewayConfig = gatewayConfig()) {
 
   app.use(createRateLimiter({ windowMs: cfg.RATE_LIMIT_WINDOW_MS, max: cfg.RATE_LIMIT_MAX }));
 
-  // API v1. Business routes (sessions T15, pay T20) mount here too.
+  // API v1.
   const v1 = express.Router();
   v1.use('/auth', buildAuthRouter());
+
+  // Create a session: authenticate by API key, forward to session-service.
+  v1.post(
+    '/sessions/create',
+    apiKeyAuth,
+    forward(cfg.SESSION_SERVICE_URL, '/sessions/create', 'post', cfg.UPSTREAM_TIMEOUT_MS),
+  );
+
   app.use('/api/v1', v1);
 
   app.use(errorHandler);

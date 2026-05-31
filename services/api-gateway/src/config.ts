@@ -10,6 +10,8 @@ const gatewayEnvSchema = baseEnvSchema.extend({
   JWT_EXPIRES_IN: z.string().default('15m'),
   MERCHANT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   MERCHANT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+  SESSION_SERVICE_URL: z.string().default('http://localhost:3001'),
+  UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 });
 
 export type GatewayConfig = z.infer<typeof gatewayEnvSchema>;

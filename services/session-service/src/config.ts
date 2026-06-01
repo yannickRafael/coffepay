@@ -7,6 +7,7 @@ const sessionEnvSchema = baseEnvSchema.extend({
   FX_SERVICE_URL: z.string().default('http://localhost:3005'),
   CHECKOUT_BASE_URL: z.string().default('http://localhost:3001'),
   FX_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  SESSION_EXPIRY_SWEEP_MS: z.coerce.number().int().positive().default(60000),
 });
 
 export type SessionConfig = z.infer<typeof sessionEnvSchema>;

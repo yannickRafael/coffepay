@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { prisma, ValidationError } from '@coffepay/shared';
+import {
+  prisma,
+  ValidationError,
+  NotFoundError,
+  ConflictError,
+  SessionStatus,
+  normalizePhone,
+} from '@coffepay/shared';
 import { sessionConfig } from './config.js';
 import { fetchQuote, type QuoteFn } from './fx.client.js';
 
@@ -73,4 +80,57 @@ export async function createSession(
     checkoutUrl: `${cfg.CHECKOUT_BASE_URL}/checkout/${session.id}`,
     expiresAt: expiresAt.toISOString(),
   };
+}
+
+export interface PublicSession {
+  sessionId: string;
+  status: string;
+  orderId: string;
+  merchantName: string;
+  amountUSD: string;
+  amountMZN: string;
+  expiresAt: string;
+  expired: boolean;
+}
+
+/** Public, customer-facing view of a session (no internal fields). */
+export async function getPublicSession(id: string): Promise<PublicSession> {
+  const session = await prisma.session.findUnique({
+    where: { id },
+    include: { merchant: { select: { name: true } } },
+  });
+  if (!session) {
+    throw new NotFoundError('Session not found', { sessionId: id });
+  }
+  return {
+    sessionId: session.id,
+    status: session.status,
+    orderId: session.orderId,
+    merchantName: session.merchant.name,
+    amountUSD: session.amountUSD.toFixed(2),
+    amountMZN: session.amountMZN.toFixed(2),
+    expiresAt: session.expiresAt.toISOString(),
+    expired: session.status === SessionStatus.PENDING && session.expiresAt.getTime() <= Date.now(),
+  };
+}
+
+/**
+ * Validate a customer MSISDN against a session (RF04). The session must be
+ * PENDING and not past its expiry. Returns the canonical MSISDN.
+ */
+export async function validatePhoneForSession(id: string, phone: unknown): Promise<string> {
+  if (typeof phone !== 'string' || phone.length === 0) {
+    throw new ValidationError('Phone is required');
+  }
+  const session = await prisma.session.findUnique({ where: { id } });
+  if (!session) {
+    throw new NotFoundError('Session not found', { sessionId: id });
+  }
+  if (session.status !== SessionStatus.PENDING) {
+    throw new ConflictError('Session is not payable', { status: session.status });
+  }
+  if (session.expiresAt.getTime() <= Date.now()) {
+    throw new ConflictError('Session has expired', { sessionId: id });
+  }
+  return normalizePhone(phone); // throws ValidationError on bad MSISDN
 }

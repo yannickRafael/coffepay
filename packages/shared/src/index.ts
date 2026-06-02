@@ -27,5 +27,8 @@ export {
 // Password / secret hashing (bcrypt).
 export { hashSecret, verifySecret } from './crypto/password.js';
 
+// MSISDN normalization / hashing (Mozambique).
+export { normalizePhone, isValidPhone, hashPhone } from './phone.js';
+
 // BullMQ queues, DLQ and worker factory.
 export * from './queue/index.js';

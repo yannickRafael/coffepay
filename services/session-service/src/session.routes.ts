@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { AuthError } from '@coffepay/shared';
-import { createSession } from './session.service.js';
+import { createSession, getPublicSession, validatePhoneForSession } from './session.service.js';
 
 export const sessionRouter = Router();
 
@@ -22,3 +22,26 @@ sessionRouter.post('/create', async (req: Request, res: Response, next: NextFunc
     next(err);
   }
 });
+
+// Public session view for the checkout client (no merchant auth, no internals).
+sessionRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await getPublicSession(req.params.id ?? '');
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Validate the customer MSISDN against the session (RF04).
+sessionRouter.post(
+  '/:id/validate-phone',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const msisdn = await validatePhoneForSession(req.params.id ?? '', req.body?.phone);
+      res.status(200).json({ valid: true, msisdn });
+    } catch (err) {
+      next(err);
+    }
+  },
+);

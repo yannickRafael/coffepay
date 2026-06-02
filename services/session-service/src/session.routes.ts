@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { AuthError } from '@coffepay/shared';
 import { createSession, getPublicSession, validatePhoneForSession } from './session.service.js';
+import { confirmPayment } from './pay.service.js';
 
 export const sessionRouter = Router();
 
@@ -45,3 +46,17 @@ sessionRouter.post(
     }
   },
 );
+
+// Confirm payment (RF05) idempotently (RF14). Async: enqueues the C2B job.
+sessionRouter.post('/:id/pay', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const idempotencyKey =
+      typeof req.headers['idempotency-key'] === 'string'
+        ? req.headers['idempotency-key']
+        : undefined;
+    const result = await confirmPayment(req.params.id ?? '', req.body?.phone, idempotencyKey);
+    res.status(202).json(result);
+  } catch (err) {
+    next(err);
+  }
+});

@@ -1,3 +1,10 @@
-const PORT = Number(process.env.PORT ?? 3003);
+import { createLogger } from '@coffepay/shared';
+import { createApp } from './app.js';
+import { callbackConfig } from './config.js';
 
-console.log(`[callback-service] stub ready (port ${PORT})`);
+const log = createLogger({ service: 'callback-service' });
+const cfg = callbackConfig();
+
+createApp().listen(cfg.CALLBACK_SERVICE_PORT, () => {
+  log.info(`[callback-service] listening on port ${cfg.CALLBACK_SERVICE_PORT}`);
+});

@@ -30,5 +30,18 @@ export { hashSecret, verifySecret } from './crypto/password.js';
 // MSISDN normalization / hashing (Mozambique).
 export { normalizePhone, isValidPhone, hashPhone } from './phone.js';
 
+// Session state machine (RF02).
+export { ALLOWED_TRANSITIONS, assertTransition, transitionSession } from './session-state.js';
+
+// C2B result processing + authenticity (RF09/RF10).
+export {
+  processResult,
+  type ProcessResultInput,
+  type ProcessResultOutcome,
+  type ResultRequestContext,
+  type ProcessResultDeps,
+  type NotifyFn,
+} from './payment-result.js';
+
 // BullMQ queues, DLQ and worker factory.
 export * from './queue/index.js';

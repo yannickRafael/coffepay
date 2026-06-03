@@ -3,13 +3,13 @@ import {
   createLogger,
   createWorker,
   c2bPayment,
+  processResult,
   QUEUE_NAMES,
-  Prisma,
   PaymentStatus,
-  TransactionStatus,
   type PaymentJob,
   type C2BParams,
   type MpesaResult,
+  type NotifyFn,
 } from '@coffepay/shared';
 import type { Worker } from 'bullmq';
 import { paymentConfig } from './config.js';
@@ -20,6 +20,7 @@ export type C2BFn = (params: C2BParams) => Promise<MpesaResult>;
 
 export interface PaymentWorkerDeps {
   c2b?: C2BFn;
+  notify?: NotifyFn;
 }
 
 export interface ProcessOutcome {
@@ -29,10 +30,11 @@ export interface ProcessOutcome {
 }
 
 /**
- * Process one payment job (RF07): run the synchronous C2B (ADR-001), persist
- * the Transaction + ProviderRequest, and set the Payment terminal status.
- * Idempotent — a Payment already SUCCESS/FAILED is skipped (no re-debit).
- * Network/timeout errors propagate so BullMQ retries (then DLQ).
+ * Process one payment job (RF07): run the synchronous C2B (ADR-001) then hand
+ * the result to the shared processResult handler (T23) for authenticity,
+ * persistence, state transition and merchant notification. Idempotent — a
+ * Payment already terminal is skipped (no re-debit). Network/timeout errors
+ * propagate so BullMQ retries (then DLQ).
  */
 export async function processPaymentJob(
   job: PaymentJob,
@@ -55,7 +57,7 @@ export async function processPaymentJob(
     data: { attempts: { increment: 1 }, status: PaymentStatus.PENDING },
   });
 
-  const requestPayload = {
+  const request = {
     amount: job.amountMZN,
     msisdn: job.msisdn,
     reference: job.reference,
@@ -63,42 +65,18 @@ export async function processPaymentJob(
   };
 
   // Throws on network/timeout (ProviderError/TimeoutError) → BullMQ retry.
-  const result = await c2b(requestPayload);
-  const status = result.success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED;
-  const now = new Date();
+  const result = await c2b(request);
 
-  const tx = await prisma.transaction.upsert({
-    where: { paymentId: job.paymentId },
-    create: {
-      paymentId: job.paymentId,
-      amountMZN: job.amountMZN,
-      status,
-      processedAt: now,
-      confirmedAt: result.success ? now : null,
-    },
-    update: { status, processedAt: now, confirmedAt: result.success ? now : null },
-  });
-
-  await prisma.providerRequest.create({
-    data: {
-      transactionId: tx.id,
-      provider: 'MPESA',
-      requestPayload: requestPayload as Prisma.InputJsonValue,
-      responsePayload: (result.raw ?? {}) as Prisma.InputJsonValue,
-    },
-  });
-
-  const paymentStatus = result.success ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
-  await prisma.payment.update({
-    where: { id: job.paymentId },
-    data: { status: paymentStatus, completedAt: now },
-  });
+  const outcome = await processResult(
+    { paymentId: job.paymentId, result, request },
+    { notify: deps.notify },
+  );
 
   log.info(
-    { paymentId: job.paymentId, status: paymentStatus, code: result.code },
+    { paymentId: job.paymentId, status: outcome.status, code: result.code },
     'payment processed',
   );
-  return { paymentId: job.paymentId, status: paymentStatus };
+  return { paymentId: job.paymentId, status: outcome.status };
 }
 
 /** Start the BullMQ worker consuming the payment-process queue. */

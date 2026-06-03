@@ -11,6 +11,10 @@ const sessionEnvSchema = baseEnvSchema.extend({
   KYC_SERVICE_URL: z.string().default('http://localhost:3004'),
   KYC_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   IDEMPOTENCY_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
+  // Payment confirmation timeout (RF08): a PROCESSING session whose payment is
+  // not confirmed within this window is failed.
+  PAYMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+  PAYMENT_TIMEOUT_SWEEP_MS: z.coerce.number().int().positive().default(30000),
 });
 
 export type SessionConfig = z.infer<typeof sessionEnvSchema>;

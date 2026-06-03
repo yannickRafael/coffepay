@@ -2,6 +2,7 @@ import { createLogger } from '@coffepay/shared';
 import { createApp } from './app.js';
 import { sessionConfig } from './config.js';
 import { startExpirySweeper } from './session.expiry.js';
+import { startPaymentTimeoutSweeper } from './payment.timeout.js';
 
 const log = createLogger({ service: 'session-service' });
 const cfg = sessionConfig();
@@ -12,3 +13,6 @@ createApp().listen(cfg.SESSION_SERVICE_PORT, () => {
 
 startExpirySweeper(cfg.SESSION_EXPIRY_SWEEP_MS);
 log.info(`[session-service] expiry sweeper every ${cfg.SESSION_EXPIRY_SWEEP_MS}ms`);
+
+startPaymentTimeoutSweeper(cfg.PAYMENT_TIMEOUT_SWEEP_MS);
+log.info(`[session-service] payment timeout sweeper every ${cfg.PAYMENT_TIMEOUT_SWEEP_MS}ms`);

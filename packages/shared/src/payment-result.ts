@@ -107,7 +107,7 @@ export async function processResult(
   const targetSession = success ? SessionStatus.COMPLETED : SessionStatus.FAILED;
   const now = new Date();
 
-  // --- Persist (atomic): Transaction + ProviderRequest + Payment ---
+  // --- Persist (atomic): Transaction + ProviderRequest + Payment + Ledger ---
   await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.upsert({
       where: { paymentId },
@@ -134,6 +134,10 @@ export async function processResult(
       where: { id: paymentId },
       data: { status: paymentStatus, completedAt: now },
     });
+    // Double-entry ledger on success only (RF21), in the same atomic transaction.
+    if (success) {
+      await recordLedger(tx, transaction.id, payment.session.merchantId, payment.session.amountMZN);
+    }
   });
 
   await transitionSession(payment.sessionId, targetSession);
@@ -161,6 +165,56 @@ export async function processResult(
   );
 
   return { paymentId, status: paymentStatus, sessionStatus: targetSession, notified };
+}
+
+/**
+ * Record a simple double-entry ledger for a successful transaction (RF21):
+ * a DEBIT (customer) and a CREDIT (merchant payable, with a running balance).
+ * Runs inside the caller's atomic transaction. Idempotent per transaction.
+ */
+async function recordLedger(
+  tx: Prisma.TransactionClient,
+  transactionId: string,
+  merchantId: string,
+  amount: Prisma.Decimal,
+): Promise<void> {
+  const existing = await tx.ledgerEntry.count({ where: { transactionId } });
+  if (existing > 0) return;
+
+  const prior = await tx.ledgerEntry.aggregate({
+    _sum: { amount: true },
+    where: { entryType: 'CREDIT', transaction: { payment: { session: { merchantId } } } },
+  });
+  const merchantBalance = new Prisma.Decimal(prior._sum.amount ?? 0).plus(amount);
+
+  await tx.ledgerEntry.createMany({
+    data: [
+      {
+        transactionId,
+        entryType: 'DEBIT',
+        amount,
+        balanceAfter: amount,
+        description: 'Customer wallet debit (M-Pesa)',
+      },
+      {
+        transactionId,
+        entryType: 'CREDIT',
+        amount,
+        balanceAfter: merchantBalance,
+        description: `Merchant payable ${merchantId}`,
+      },
+    ],
+  });
+
+  await tx.auditLog.create({
+    data: {
+      action: 'LEDGER_RECORDED',
+      entityType: 'Transaction',
+      entityId: transactionId,
+      transactionId,
+      changes: { amount: amount.toFixed(2), merchantBalance: merchantBalance.toFixed(2) },
+    },
+  });
 }
 
 /** Resolve the merchant's active webhook for the event and enqueue a notify job. */

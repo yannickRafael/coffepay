@@ -114,6 +114,44 @@ export async function getPublicSession(id: string): Promise<PublicSession> {
   };
 }
 
+export interface ReturnTarget {
+  terminal: boolean;
+  /** Absolute merchant URL (terminal) or the checkout path (still in progress). */
+  redirectUrl: string;
+  status: string;
+}
+
+/**
+ * Resolve where to send the customer's browser from the checkout (RF18). When
+ * the session has reached a terminal outcome, redirect to the merchant's
+ * callbackUrl carrying only `session` + `status` (no sensitive data — the
+ * merchant verifies via webhook or GET /sessions/:id). Otherwise keep the
+ * customer on the checkout page.
+ */
+export async function getReturnTarget(id: string): Promise<ReturnTarget> {
+  const session = await prisma.session.findUnique({ where: { id } });
+  if (!session) {
+    throw new NotFoundError('Session not found', { sessionId: id });
+  }
+
+  const expired =
+    session.status === SessionStatus.PENDING && session.expiresAt.getTime() <= Date.now();
+  const status = expired ? SessionStatus.EXPIRED : session.status;
+  const terminal =
+    status === SessionStatus.COMPLETED ||
+    status === SessionStatus.FAILED ||
+    status === SessionStatus.EXPIRED;
+
+  if (!terminal) {
+    return { terminal: false, redirectUrl: `/checkout/${id}`, status };
+  }
+
+  const url = new URL(session.callbackUrl);
+  url.searchParams.set('session', id);
+  url.searchParams.set('status', status);
+  return { terminal: true, redirectUrl: url.toString(), status };
+}
+
 /**
  * Validate a customer MSISDN against a session (RF04). The session must be
  * PENDING and not past its expiry. Returns the canonical MSISDN.

@@ -1,9 +1,25 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { isAppError } from '@coffepay/shared';
-import { getPublicSession } from './session.service.js';
+import { getPublicSession, getReturnTarget } from './session.service.js';
 import { renderCheckoutPage, renderStatePage, renderNotFound } from './checkout.view.js';
 
 export const checkoutRouter = Router();
+
+// Return-to-merchant redirect (RF18). Terminal session → 302 to the merchant's
+// callbackUrl with ?session=&status=; still in progress → back to the checkout.
+// Declared before '/:id' so the more specific path wins.
+checkoutRouter.get('/:id/return', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const target = await getReturnTarget(req.params.id ?? '');
+    res.redirect(302, target.redirectUrl);
+  } catch (err) {
+    if (isAppError(err) && err.httpStatus === 404) {
+      res.status(404).type('html').send(renderNotFound());
+      return;
+    }
+    next(err);
+  }
+});
 
 // Server-rendered checkout page (RF03). Shows the form for a payable session,
 // otherwise an informational state page; 404 (HTML) for unknown sessions.

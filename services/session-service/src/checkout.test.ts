@@ -71,6 +71,51 @@ describe('GET /checkout/:id', () => {
   });
 });
 
+describe('GET /checkout/:id/return', () => {
+  test('terminal session redirects (302) to merchant callbackUrl with session+status', async () => {
+    const s = await makeSession(SessionStatus.COMPLETED, future());
+    const res = await request(app).get(`/checkout/${s.id}/return`).redirects(0);
+    expect(res.status).toBe(302);
+    const loc = new URL(res.headers.location);
+    expect(`${loc.origin}${loc.pathname}`).toBe('https://m.example/cb');
+    expect(loc.searchParams.get('session')).toBe(s.id);
+    expect(loc.searchParams.get('status')).toBe('COMPLETED');
+  });
+
+  test('failed session carries status=FAILED', async () => {
+    const s = await makeSession(SessionStatus.FAILED, future());
+    const res = await request(app).get(`/checkout/${s.id}/return`).redirects(0);
+    expect(res.status).toBe(302);
+    expect(new URL(res.headers.location).searchParams.get('status')).toBe('FAILED');
+  });
+
+  test('past-due PENDING session redirects with status=EXPIRED', async () => {
+    const s = await makeSession(SessionStatus.PENDING, past());
+    const res = await request(app).get(`/checkout/${s.id}/return`).redirects(0);
+    expect(res.status).toBe(302);
+    expect(new URL(res.headers.location).searchParams.get('status')).toBe('EXPIRED');
+  });
+
+  test('in-progress session redirects back to the checkout (no merchant redirect)', async () => {
+    const s = await makeSession(SessionStatus.PROCESSING, future());
+    const res = await request(app).get(`/checkout/${s.id}/return`).redirects(0);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`/checkout/${s.id}`);
+  });
+
+  test('does not leak sensitive data in the redirect query', async () => {
+    const s = await makeSession(SessionStatus.COMPLETED, future());
+    const res = await request(app).get(`/checkout/${s.id}/return`).redirects(0);
+    const loc = new URL(res.headers.location);
+    expect([...loc.searchParams.keys()].sort()).toEqual(['session', 'status']);
+  });
+
+  test('404 for an unknown session', async () => {
+    const res = await request(app).get('/checkout/00000000-0000-0000-0000-000000000000/return');
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('GET /sessions/:id', () => {
   test('returns the public JSON view without internal fields', async () => {
     const s = await makeSession(SessionStatus.PENDING, future());

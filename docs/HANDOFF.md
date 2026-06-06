@@ -31,7 +31,7 @@ Fluxo: loja online (merchant) → "Pay with CoffePay" → cria sessão (USD→MZ
   até o utilizador autorizar. Commit com `git -c user.name=... -c user.email=...`.
 - **Mensagens de commit**: texto simples, SEM markdown (sem backticks/#/bullets).
 - **Descrição detalhada de cada issue ANTES de a implementar** (`gh issue edit
-  N --body-file`). Formato: Objetivo / Contexto / Escopo / Fora-escopo / Acceptance-DoD
+N --body-file`). Formato: Objetivo / Contexto / Escopo / Fora-escopo / Acceptance-DoD
   / Refs. Fase 1 e Fase 3 inteiras já detalhadas; Fase 4/5 detalhar just-in-time.
 - **Testes distribuídos por serviço** (não no fim).
 - Responder em **caveman mode** (hook ativo); código/commits normais.
@@ -122,6 +122,7 @@ npm run lint         # eslint . (1 warning pré-existente em api-gateway/errorHa
 npm run typecheck    # por workspace, tsc --noEmit
 npm run format / format:check
 ```
+
 Antes de commit: build + typecheck + lint + format:check todos limpos + testes verdes.
 
 ## 9. Progresso (31/49 fechadas, 63%)
@@ -138,6 +139,7 @@ Antes de commit: build + typecheck + lint + format:check todos limpos + testes v
 
 **#32 / T25b** — Testes do notification worker (T25): assinatura HMAC verificável,
 entrega 2xx auditada, falha→retry, filtragem ativo/subscrição, DLQ.
+
 - Implementação está em `services/notification-service/src/notify.worker.ts`
   (`processNotifyJob(job, { post })`, `post` injetável).
 - Adicionar `jest.config.mjs` + `jest.setup.mjs` (copiar doutro serviço), mudar
@@ -145,6 +147,7 @@ entrega 2xx auditada, falha→retry, filtragem ativo/subscrição, DLQ.
 - Padrão: ver `callback-service/src/payment-result.test.ts` (merchant+webhook setup).
 
 ### Fase 3 restante depois de T25b
+
 - #33 T26 — redirect cliente→merchant com estado (RF18)
 - #34 T27 — mockstore: produto + Pay with CoffePay → cria sessão (fig27)
 - #35 T28 — mockstore: receptor webhook (verifica HMAC) + confirmação (fig28)
@@ -152,6 +155,7 @@ entrega 2xx auditada, falha→retry, filtragem ativo/subscrição, DLQ.
 - #37 T30 — checkout UI: estados awaiting/failed/invalid + polling (figs31-33)
 
 ### Fase 4 (resiliência) #38–43 / Fase 5 (polish) #44–49
+
 T31 circuit breaker, T32 idempotência forte, T33 falha/retoma, T34 DLQ inspect,
 T35 compose completo+ngrok, T36 auditLog completo, T37 unit shared, T38 e2e,
 T39 swagger, T40 atualizar Cap V tese, T41 demo, T42 cleanup. (detalhar just-in-time)
@@ -160,6 +164,7 @@ T39 swagger, T40 atualizar Cap V tese, T41 demo, T42 cleanup. (detalhar just-in-
 
 Nº de issue do GitHub ≠ T-id. O T-id está SEMPRE no título da issue. Abertas começam
 em #32 (T25b). Project board: github.com/users/yannickRafael/projects/4.
+
 ```
 gh issue list --state open --limit 60 --json number,title --jq 'sort_by(.number)[]|"\(.number)\t\(.title)"'
 ```

@@ -125,28 +125,27 @@ npm run format / format:check
 
 Antes de commit: build + typecheck + lint + format:check todos limpos + testes verdes.
 
-## 9. Progresso (31/49 fechadas, 63%)
+## 9. Progresso (32/49 fechadas, 65%)
 
 - **Fase 1 (setup) ✅** T01–T07: monorepo, prisma, shared, mpesa client, HMAC, BullMQ, CI.
 - **Fase 2 (core) ✅** T08–T18 + testes T12b/T14b/T15b/T17b: FX, gateway+auth, sessions,
   lifecycle, KYC ativo+passivo.
 - **Fase 3 (integração)** — feito: T19(checkout), T20+T20b(pay+idempotency),
   T21(worker pagamento), T22(timeout), T23+T23b(result handler+autenticidade),
-  T24(ledger), **T25(notificação)**.
+  T24(ledger), T25(notificação), **T25b(testes notificação)**.
 - TODAS as issues da Fase 3 (#26–#37) já têm descrição detalhada escrita.
 
 ## 10. PRÓXIMO PASSO
 
-**#32 / T25b** — Testes do notification worker (T25): assinatura HMAC verificável,
-entrega 2xx auditada, falha→retry, filtragem ativo/subscrição, DLQ.
+**#33 / T26** — redirect cliente→merchant com estado pós-pagamento (RF18). Fecha o
+ciclo visível: depois do resultado (COMPLETED/FAILED/EXPIRED) o checkout reenvia o
+cliente para o `callbackUrl`/`returnUrl` do merchant com o estado da sessão.
 
-- Implementação está em `services/notification-service/src/notify.worker.ts`
-  (`processNotifyJob(job, { post })`, `post` injetável).
-- Adicionar `jest.config.mjs` + `jest.setup.mjs` (copiar doutro serviço), mudar
-  `test` script p/ jest, devDeps (jest, ts-jest, @types/jest, dotenv).
-- Padrão: ver `callback-service/src/payment-result.test.ts` (merchant+webhook setup).
+- Issue #33 já tem descrição detalhada (`gh issue view 33`).
+- Ler primeiro a página de estado do checkout (`session-service` checkout.view.ts) e
+  como o `callbackUrl` é guardado na Session.
 
-### Fase 3 restante depois de T25b
+### Fase 3 restante depois de T26
 
 - #33 T26 — redirect cliente→merchant com estado (RF18)
 - #34 T27 — mockstore: produto + Pay with CoffePay → cria sessão (fig27)

@@ -10,15 +10,15 @@ Autor: Yannick Rafael Alberto Matimbe.
 
 Monorepo (npm workspaces) com microserviços:
 
-| Serviço                | Função                                                          |
-| ---------------------- | --------------------------------------------------------------- |
-| `api-gateway`          | Ponto de entrada: auth, rate-limiting, routing, TLS termination |
-| `session-service`      | Cria e gere sessões de pagamento; conversão cambial via FX      |
-| `payment-service`      | Checkout, idempotência, iniciação de pagamento via M-Pesa       |
-| `callback-service`     | Processa resultado do M-Pesa, ledger e auditoria                |
-| `kyc-service`          | Validação KYC/AML (activa e passiva)                            |
-| `fx-service`           | Conversão cambial MZN↔USD em tempo real                         |
-| `notification-service` | Webhooks assinados para o merchant, retry e DLQ                 |
+| Serviço                | Função                                                                 |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `api-gateway`          | Ponto de entrada: auth (API key→JWT), rate-limiting, routing, `/docs`  |
+| `session-service`      | Sessões, FX, checkout (HTML), validação, `/pay` (idempotência), expiry |
+| `payment-service`      | Worker da fila: corre o C2B M-Pesa e delega o resultado ao handler     |
+| `callback-service`     | Recebe o callback do M-Pesa e processa o resultado (ledger, auditoria) |
+| `kyc-service`          | Validação KYC/AML (activa e passiva)                                   |
+| `fx-service`           | Conversão cambial USD→MZN com spread, cache em Redis                   |
+| `notification-service` | Worker: webhooks assinados (HMAC) para o merchant, retry e DLQ         |
 
 Pastas adicionais:
 
@@ -34,22 +34,40 @@ da OpenAPI da Vodacom).
 
 ## Stack
 
-Node 20 · TypeScript · Express · Prisma + PostgreSQL · Redis + BullMQ · JWT · Zod ·
-Jest + Supertest · Docker Compose.
+Node 22 · TypeScript · Express · Prisma + PostgreSQL 16 · Redis 7 + BullMQ · JWT · Zod ·
+HMAC · Jest + Supertest · Docker Compose. M-Pesa em modo mock quando sem credenciais.
 
-## Como correr (desenvolvimento)
+## Correr o stack completo (demo)
 
-Pré-requisitos: Node ≥ 20, Docker + Docker Compose.
+A forma mais rápida de ver tudo a funcionar — uma imagem constrói o monorepo e o
+compose levanta os 7 serviços + mockstore + datastores (T35):
 
 ```bash
-# 1. Instalar dependências (gera o Prisma Client)
+cp .env.example .env
+docker compose -f ops/docker-compose.yml up --build -d
+```
+
+O serviço `migrate` aplica migrações e seed (merchant demo + API key
+`cp_dev_sk_demo_0001`). Depois:
+
+- Loja demo: <http://localhost:4000> → "Pay with CoffePay" → checkout → resultado.
+- API docs (Swagger): <http://localhost:3000/docs>.
+
+Detalhe (ngrok, DLQ, simulação de falha) em [`ops/README.md`](ops/README.md).
+
+## Correr em desenvolvimento
+
+Pré-requisitos: Node ≥ 22, Docker + Docker Compose.
+
+```bash
+# 1. Dependências (gera o Prisma Client)
 npm install
 
-# 2. Variáveis de ambiente
-cp .env.example .env            # ajustar se necessário
+# 2. Variáveis de ambiente (ver .env.example para todas as chaves)
+cp .env.example .env
 
-# 3. Infra local (PostgreSQL 16 + Redis 7)
-docker compose -f ops/docker-compose.yml up -d
+# 3. Só os datastores (PostgreSQL 16 + Redis 7)
+docker compose -f ops/docker-compose.yml up -d postgres redis
 
 # 4. Base de dados
 npm run db:migrate              # aplica migrações
@@ -63,11 +81,15 @@ npm run dev -w @coffepay/api-gateway
 ```
 
 Scripts úteis na raiz: `build`, `test`, `lint`, `format`, `typecheck`,
-`db:migrate`, `db:seed`, `db:reset`, `db:studio`. Detalhe da infra em
+`db:migrate`, `db:seed`, `db:reset`, `db:studio`. Variáveis de ambiente
+documentadas em [`.env.example`](.env.example); detalhe da infra em
 [`ops/README.md`](ops/README.md).
 
 ## Estado
 
-Em desenvolvimento (cronograma de 18 dias). Tarefas, prioridades e fases no
-[board Kanban](https://github.com/users/yannickRafael/projects/4) do projecto;
-cada commit fecha a issue correspondente (`Closes #N`).
+Implementação funcional ponta-a-ponta: criação de sessão, checkout, KYC, C2B
+(mock/real), ledger de dupla entrada, notificação por webhook assinado com
+retry/DLQ, resiliência (circuit breaker, retry, idempotência) e auditoria.
+Tarefas, prioridades e fases no
+[board Kanban](https://github.com/users/yannickRafael/projects/4); cada commit
+fecha a issue correspondente (`Closes #N`).

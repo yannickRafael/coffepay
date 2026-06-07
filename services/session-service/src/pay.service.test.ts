@@ -7,7 +7,7 @@ import {
   hashPhone,
   type PaymentJob,
 } from '@coffepay/shared';
-import { confirmPayment } from './pay.service.js';
+import { confirmPayment, paymentRefs } from './pay.service.js';
 import type { KycCheckResult } from './kyc.client.js';
 
 const NUIT = 'TST20B00001';
@@ -125,6 +125,58 @@ describe('confirmPayment — idempotency (RF14)', () => {
 
     const count = await prisma.payment.count({ where: { sessionId: s.id } });
     expect(count).toBe(1);
+  });
+
+  test('concurrent confirms with the same key create exactly one payment (RNF05)', async () => {
+    const s = await makeSession();
+    const a = jobCollector();
+    const b = jobCollector();
+
+    const [r1, r2] = await Promise.all([
+      confirmPayment(s.id, PHONE, 'k-race', { kycCheck: allow, enqueue: a.enqueue }),
+      confirmPayment(s.id, PHONE, 'k-race', { kycCheck: allow, enqueue: b.enqueue }),
+    ]);
+
+    // Both resolve to the same payment; no duplicate created.
+    expect(r1.paymentId).toBe(r2.paymentId);
+    expect(await prisma.payment.count({ where: { sessionId: s.id } })).toBe(1);
+    // At most one job is enqueued (the winner); the loser replays.
+    expect(a.jobs.length + b.jobs.length).toBeLessThanOrEqual(1);
+  });
+
+  test('concurrent confirms with different keys still create one payment (sessionId unique)', async () => {
+    const s = await makeSession();
+    const a = jobCollector();
+    const b = jobCollector();
+
+    const results = await Promise.allSettled([
+      confirmPayment(s.id, PHONE, 'k-diff-1', { kycCheck: allow, enqueue: a.enqueue }),
+      confirmPayment(s.id, PHONE, 'k-diff-2', { kycCheck: allow, enqueue: b.enqueue }),
+    ]);
+
+    // The unique sessionId guarantees a single payment regardless of keys.
+    expect(await prisma.payment.count({ where: { sessionId: s.id } })).toBe(1);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    expect(ok.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('paymentRefs — stable per payment (RNF05)', () => {
+  test('deterministic, distinct, and within length limits', () => {
+    const id = '550e8400-e29b-41d4-a716-446655440000';
+    const r1 = paymentRefs(id);
+    const r2 = paymentRefs(id);
+    expect(r1).toEqual(r2); // stable across calls
+    expect(r1.reference).not.toBe(r1.thirdPartyReference);
+    expect(r1.reference.length).toBeLessThanOrEqual(18);
+    expect(r1.thirdPartyReference.length).toBeLessThanOrEqual(18);
+  });
+
+  test('a confirmed payment enqueues the deterministic references', async () => {
+    const s = await makeSession();
+    const { jobs, enqueue } = jobCollector();
+    const res = await confirmPayment(s.id, PHONE, 'k-refs', { kycCheck: allow, enqueue });
+    expect(jobs[0]).toMatchObject(paymentRefs(res.paymentId));
   });
 });
 

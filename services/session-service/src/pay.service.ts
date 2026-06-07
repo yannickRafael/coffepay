@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import {
   prisma,
+  Prisma,
   ForbiddenError,
+  ConflictError,
   SessionStatus,
   hashPhone,
   enqueuePayment,
@@ -21,6 +22,36 @@ export interface PayResult {
 export interface ConfirmPaymentDeps {
   kycCheck?: KycCheckFn;
   enqueue?: (job: PaymentJob) => Promise<unknown>;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
+
+/**
+ * Provider references derived deterministically from the payment id (RNF05):
+ * stable per Payment so every retry sends the same reference and the provider
+ * can deduplicate (no double debit). reference and thirdPartyReference differ.
+ */
+export function paymentRefs(paymentId: string): { reference: string; thirdPartyReference: string } {
+  const compact = paymentId.replace(/-/g, '');
+  return {
+    reference: `R${compact}`.slice(0, 18),
+    thirdPartyReference: `T${compact}`.slice(0, 18),
+  };
+}
+
+/** A concurrent confirm won the race: return the existing payment as a replay. */
+async function replayExisting(sessionId: string, key: string): Promise<PayResult> {
+  const existingKey = await prisma.idempotencyKey.findUnique({ where: { key } });
+  if (existingKey?.result) {
+    return existingKey.result as unknown as PayResult;
+  }
+  const payment = await prisma.payment.findUnique({ where: { sessionId } });
+  if (payment) {
+    return { paymentId: payment.id, sessionId, status: SessionStatus.PROCESSING };
+  }
+  throw new ConflictError('Concurrent payment in progress', { sessionId });
 }
 
 /**
@@ -63,14 +94,23 @@ export async function confirmPayment(
     update: {},
   });
 
-  const payment = await prisma.payment.create({
-    data: {
-      sessionId,
-      clientId: client.id,
-      idempotencyKey: key,
-      status: 'INITIATED',
-    },
-  });
+  // Payment.sessionId is @unique: only one payment can ever exist per session.
+  // A concurrent confirm that loses this race hits a unique violation and is
+  // served as a replay instead of creating a duplicate (RNF05).
+  let payment;
+  try {
+    payment = await prisma.payment.create({
+      data: {
+        sessionId,
+        clientId: client.id,
+        idempotencyKey: key,
+        status: 'INITIATED',
+      },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) return replayExisting(sessionId, key);
+    throw err;
+  }
 
   await transitionSession(sessionId, SessionStatus.PROCESSING);
 
@@ -85,13 +125,14 @@ export async function confirmPayment(
     },
   });
 
+  const refs = paymentRefs(payment.id);
   const job: PaymentJob = {
     paymentId: payment.id,
     sessionId,
     msisdn,
     amountMZN: session.amountMZN.toFixed(2),
-    reference: payment.id.slice(0, 18),
-    thirdPartyReference: randomUUID().slice(0, 18),
+    reference: refs.reference,
+    thirdPartyReference: refs.thirdPartyReference,
   };
   await enqueue(job);
 

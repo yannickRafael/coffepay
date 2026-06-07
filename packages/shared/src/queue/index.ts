@@ -11,3 +11,9 @@ export {
   closeQueues,
 } from './queues.js';
 export { createWorker, type WorkerOptions } from './worker.js';
+export {
+  listDeadLetters,
+  reprocessDeadLetter,
+  type DeadLetterView,
+  type ReprocessResult,
+} from './dlq.js';

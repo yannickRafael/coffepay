@@ -68,6 +68,25 @@ sem débito duplo (RNF05).
 Provado automaticamente em `services/payment-service/src/payment.worker.test.ts`
 (hold→resume sem débito duplo) e `packages/shared/src/mpesa/outage.test.ts`.
 
+## Inspecionar / reprocessar a DLQ (T34)
+
+Jobs que esgotam as tentativas são movidos para uma DLQ (`payment-process-dlq`,
+`merchant-notify-dlq`). O api-gateway expõe endpoints admin (protegidos por
+`X-Admin-Key` = `ADMIN_API_KEY`; sem chave configurada, ficam fechados):
+
+```bash
+# Listar dead letters (paginado: ?start=&end=)
+curl -H "X-Admin-Key: $ADMIN_API_KEY" \
+  http://localhost:3000/admin/dlq/payment-process-dlq
+
+# Reprocessar uma (re-enfileira na fila de origem, remove da DLQ, audita DLQ_REPROCESSED)
+curl -X POST -H "X-Admin-Key: $ADMIN_API_KEY" \
+  http://localhost:3000/admin/dlq/payment-process-dlq/<id>/reprocess
+```
+
+Reprocessar é seguro repetir: a idempotência (RNF05/T32) evita débito ou
+notificação duplicados.
+
 ## Notas
 
 - Dados persistem em volumes nomeados (`postgres-data`, `redis-data`).

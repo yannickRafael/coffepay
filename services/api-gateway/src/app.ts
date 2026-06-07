@@ -6,6 +6,7 @@ import { createRateLimiter } from './middleware/rateLimit.js';
 import { apiKeyAuth } from './middleware/apiKeyAuth.js';
 import { forward } from './middleware/forward.js';
 import { buildAuthRouter } from './auth.routes.js';
+import { buildAdminRouter } from './admin.routes.js';
 import { gatewayConfig, type GatewayConfig } from './config.js';
 
 export function createApp(cfg: GatewayConfig = gatewayConfig()) {
@@ -33,6 +34,9 @@ export function createApp(cfg: GatewayConfig = gatewayConfig()) {
   );
 
   app.use('/api/v1', v1);
+
+  // Operational admin surface (DLQ inspect/reprocess — T34), admin-key protected.
+  app.use('/admin', buildAdminRouter(cfg));
 
   app.use(errorHandler);
   return app;

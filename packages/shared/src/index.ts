@@ -33,6 +33,14 @@ export { normalizePhone, isValidPhone, hashPhone } from './phone.js';
 // Central audit logging (RNF07).
 export { writeAudit, type AuditInput } from './audit.js';
 
+// Periodic merchant settlement (thesis V2).
+export {
+  settleMerchant,
+  runSettlements,
+  merchantsWithPendingSettlement,
+  type SettlementResult,
+} from './settlement.js';
+
 // Session state machine (RF02).
 export { ALLOWED_TRANSITIONS, assertTransition, transitionSession } from './session-state.js';
 

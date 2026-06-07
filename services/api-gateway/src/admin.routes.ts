@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { listDeadLetters, reprocessDeadLetter } from '@coffepay/shared';
+import { listDeadLetters, reprocessDeadLetter, runSettlements, prisma } from '@coffepay/shared';
 import { adminAuth } from './middleware/adminAuth.js';
 import { gatewayConfig, type GatewayConfig } from './config.js';
 
@@ -35,6 +35,33 @@ export function buildAdminRouter(cfg: GatewayConfig = gatewayConfig()) {
       }
     },
   );
+
+  // Run the periodic settlement on-demand (T44): settle every merchant with
+  // pending confirmed transactions.
+  router.post('/settlements/run', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const settlements = await runSettlements();
+      res.json({ count: settlements.length, settlements });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // List settlements (optionally by merchant).
+  router.get('/settlements', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const merchantId =
+        typeof req.query.merchantId === 'string' ? req.query.merchantId : undefined;
+      const items = await prisma.settlement.findMany({
+        where: merchantId ? { merchantId } : {},
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      });
+      res.json({ count: items.length, items });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   return router;
 }

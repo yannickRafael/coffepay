@@ -1,5 +1,23 @@
 name: coffepay
 
+# Common environment shared by all app services. Internal traffic uses the
+# compose service names; CHECKOUT_BASE_URL / PUBLIC_BASE_URL are host-facing
+# (the customer's browser) so they use localhost ports.
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://${POSTGRES_USER:-coffepay}:${POSTGRES_PASSWORD:-coffepay}@postgres:5432/${POSTGRES_DB:-coffepay}
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: ${JWT_SECRET:-change-me-dev-only}
+  WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-change-me-dev-only}
+  MPESA_MOCK: 'true'
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+x-app-build: &app-build
+  build:
+    context: ..
+    dockerfile: ops/Dockerfile
+  image: coffepay/app:dev
+
 services:
   postgres:
     image: postgres:16
@@ -34,8 +52,154 @@ services:
       timeout: 3s
       retries: 10
 
-# Microservices + mockstore + ngrok are wired into this compose in T35.
-# Until then, services run locally (npm run dev) against these datastores.
+  # One-shot: apply migrations and seed the demo merchant, then exit. App
+  # services wait for this to finish successfully.
+  migrate:
+    <<: *app-build
+    container_name: coffepay-migrate
+    command: sh -c "npm run db:deploy && npm run db:seed"
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api-gateway:
+    <<: *app-build
+    container_name: coffepay-api-gateway
+    command: node services/api-gateway/dist/index.js
+    environment:
+      <<: *app-env
+      API_GATEWAY_PORT: '3000'
+      SESSION_SERVICE_URL: http://session-service:3001
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-change-me-admin-dev-only}
+    ports:
+      - '3000:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  session-service:
+    <<: *app-build
+    container_name: coffepay-session-service
+    command: node services/session-service/dist/index.js
+    environment:
+      <<: *app-env
+      SESSION_SERVICE_PORT: '3001'
+      FX_SERVICE_URL: http://fx-service:3005
+      KYC_SERVICE_URL: http://kyc-service:3004
+      CHECKOUT_BASE_URL: http://localhost:3001
+    ports:
+      - '3001:3001'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  payment-service:
+    <<: *app-build
+    container_name: coffepay-payment-service
+    command: node services/payment-service/dist/index.js
+    environment:
+      <<: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  callback-service:
+    <<: *app-build
+    container_name: coffepay-callback-service
+    command: node services/callback-service/dist/index.js
+    environment:
+      <<: *app-env
+      CALLBACK_SERVICE_PORT: '3003'
+    ports:
+      - '3003:3003'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  kyc-service:
+    <<: *app-build
+    container_name: coffepay-kyc-service
+    command: node services/kyc-service/dist/index.js
+    environment:
+      <<: *app-env
+      KYC_SERVICE_PORT: '3004'
+    ports:
+      - '3004:3004'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  fx-service:
+    <<: *app-build
+    container_name: coffepay-fx-service
+    command: node services/fx-service/dist/index.js
+    environment:
+      <<: *app-env
+      FX_SERVICE_PORT: '3005'
+    ports:
+      - '3005:3005'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  notification-service:
+    <<: *app-build
+    container_name: coffepay-notification-service
+    command: node services/notification-service/dist/index.js
+    environment:
+      <<: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  mockstore:
+    <<: *app-build
+    container_name: coffepay-mockstore
+    command: node mockstore/dist/index.js
+    environment:
+      <<: *app-env
+      MOCKSTORE_PORT: '4000'
+      COFFEPAY_API_URL: http://api-gateway:3000
+      MOCKSTORE_API_KEY: ${MOCKSTORE_API_KEY:-cp_dev_sk_demo_0001}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
+      MOCKSTORE_WEBHOOK_SECRET: ${WEBHOOK_SIGNING_SECRET:-change-me-dev-only}
+    ports:
+      - '4000:4000'
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+  # Optional: expose the mockstore publicly so CoffePay webhooks reach it.
+  # Enable with: docker compose --profile ngrok up   (needs NGROK_AUTHTOKEN)
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: coffepay-ngrok
+    profiles: ['ngrok']
+    command: http mockstore:4000
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - '4040:4040' # ngrok inspection UI
+    depends_on:
+      mockstore:
+        condition: service_started
 
 volumes:
   postgres-data:

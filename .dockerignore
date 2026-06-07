@@ -1,0 +1,10 @@
+# Keep the build context small and avoid copying host-built artifacts that may
+# not match the container platform.
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+.env
+*.log
+npm-debug.log*

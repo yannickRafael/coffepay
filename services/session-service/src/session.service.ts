@@ -6,6 +6,7 @@ import {
   ConflictError,
   SessionStatus,
   normalizePhone,
+  writeAudit,
 } from '@coffepay/shared';
 import { sessionConfig } from './config.js';
 import { fetchQuote, type QuoteFn } from './fx.client.js';
@@ -61,14 +62,12 @@ export async function createSession(
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      action: 'SESSION_CREATED',
-      entityType: 'Session',
-      entityId: session.id,
-      actorId: merchantId,
-      changes: { orderId, amountUSD: amountUSD.toFixed(2), amountMZN: quote.amountMZN },
-    },
+  await writeAudit({
+    action: 'SESSION_CREATED',
+    entityType: 'Session',
+    entityId: session.id,
+    actorId: merchantId,
+    changes: { orderId, amountUSD: amountUSD.toFixed(2), amountMZN: quote.amountMZN },
   });
 
   return {

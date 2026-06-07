@@ -30,6 +30,9 @@ export { hashSecret, verifySecret } from './crypto/password.js';
 // MSISDN normalization / hashing (Mozambique).
 export { normalizePhone, isValidPhone, hashPhone } from './phone.js';
 
+// Central audit logging (RNF07).
+export { writeAudit, type AuditInput } from './audit.js';
+
 // Session state machine (RF02).
 export { ALLOWED_TRANSITIONS, assertTransition, transitionSession } from './session-state.js';
 

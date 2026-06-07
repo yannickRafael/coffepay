@@ -1,6 +1,7 @@
 import { SessionStatus, type Session } from '@prisma/client';
 import { prisma } from './db.js';
 import { ConflictError, NotFoundError } from './errors.js';
+import { writeAudit } from './audit.js';
 
 /**
  * Allowed session state transitions (RF02). Terminal states have no outgoing
@@ -44,14 +45,12 @@ export async function transitionSession(
     data: { status: to },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      action: `SESSION_${to}`,
-      entityType: 'Session',
-      entityId: sessionId,
-      actorId: actorId ?? null,
-      changes: { from: session.status, to },
-    },
+  await writeAudit({
+    action: `SESSION_${to}`,
+    entityType: 'Session',
+    entityId: sessionId,
+    actorId: actorId ?? null,
+    changes: { from: session.status, to },
   });
 
   return updated;

@@ -3,6 +3,7 @@ import { prisma } from './db.js';
 import { createLogger } from './logger.js';
 import { NotFoundError, ValidationError } from './errors.js';
 import { transitionSession } from './session-state.js';
+import { writeAudit } from './audit.js';
 import { enqueueNotify } from './queue/queues.js';
 import type { MpesaResult } from './mpesa/types.js';
 
@@ -142,13 +143,11 @@ export async function processResult(
 
   await transitionSession(payment.sessionId, targetSession);
 
-  await prisma.auditLog.create({
-    data: {
-      action: 'PAYMENT_RESULT_PROCESSED',
-      entityType: 'Payment',
-      entityId: paymentId,
-      changes: { success, code: result.code, sessionStatus: targetSession },
-    },
+  await writeAudit({
+    action: 'PAYMENT_RESULT_PROCESSED',
+    entityType: 'Payment',
+    entityId: paymentId,
+    changes: { success, code: result.code, sessionStatus: targetSession },
   });
 
   const event = success ? 'payment.success' : 'payment.failed';
@@ -206,15 +205,16 @@ async function recordLedger(
     ],
   });
 
-  await tx.auditLog.create({
-    data: {
+  await writeAudit(
+    {
       action: 'LEDGER_RECORDED',
       entityType: 'Transaction',
       entityId: transactionId,
       transactionId,
       changes: { amount: amount.toFixed(2), merchantBalance: merchantBalance.toFixed(2) },
     },
-  });
+    tx,
+  );
 }
 
 /** Resolve the merchant's active webhook for the event and enqueue a notify job. */

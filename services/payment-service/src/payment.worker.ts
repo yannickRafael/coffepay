@@ -4,6 +4,7 @@ import {
   createWorker,
   c2bPayment,
   processResult,
+  writeAudit,
   QUEUE_NAMES,
   PaymentStatus,
   type PaymentJob,
@@ -63,6 +64,18 @@ export async function processPaymentJob(
     reference: job.reference,
     thirdPartyReference: job.thirdPartyReference,
   };
+
+  // Audit the provider call without the MSISDN in clear (RNF07).
+  await writeAudit({
+    action: 'C2B_REQUESTED',
+    entityType: 'Payment',
+    entityId: job.paymentId,
+    changes: {
+      amountMZN: job.amountMZN,
+      reference: job.reference,
+      thirdPartyReference: job.thirdPartyReference,
+    },
+  });
 
   // Throws on network/timeout (ProviderError/TimeoutError) → BullMQ retry.
   const result = await c2b(request);

@@ -1,4 +1,4 @@
-import { prisma, createLogger, PaymentStatus, SessionStatus } from '@coffepay/shared';
+import { prisma, createLogger, writeAudit, PaymentStatus, SessionStatus } from '@coffepay/shared';
 import { sessionConfig } from './config.js';
 import { transitionSession } from './session.state.js';
 
@@ -32,13 +32,11 @@ export async function expireStuckPayments(now: Date = new Date()): Promise<numbe
         data: { status: PaymentStatus.FAILED, completedAt: now },
       });
       await transitionSession(p.sessionId, SessionStatus.FAILED);
-      await prisma.auditLog.create({
-        data: {
-          action: 'PAYMENT_TIMEOUT',
-          entityType: 'Payment',
-          entityId: p.id,
-          changes: { reason: 'confirmation_timeout', timeoutMs: cfg.PAYMENT_TIMEOUT_MS },
-        },
+      await writeAudit({
+        action: 'PAYMENT_TIMEOUT',
+        entityType: 'Payment',
+        entityId: p.id,
+        changes: { reason: 'confirmation_timeout', timeoutMs: cfg.PAYMENT_TIMEOUT_MS },
       });
       failed++;
     } catch (err) {

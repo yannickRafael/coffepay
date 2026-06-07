@@ -4,6 +4,7 @@ import {
   createLogger,
   createWorker,
   signPayload,
+  writeAudit,
   SIGNATURE_HEADER,
   QUEUE_NAMES,
   type MerchantNotifyJob,
@@ -72,20 +73,29 @@ export async function processNotifyJob(
   const signed = signPayload(body, cfg.WEBHOOK_SIGNING_SECRET);
 
   // Throws on non-2xx / network / timeout → BullMQ retry → DLQ.
-  const res = await post(
-    webhook.url,
-    body,
-    { [SIGNATURE_HEADER]: signed.header },
-    cfg.NOTIFY_REQUEST_TIMEOUT_MS,
-  );
-
-  await prisma.auditLog.create({
-    data: {
-      action: 'WEBHOOK_DELIVERED',
+  let res;
+  try {
+    res = await post(
+      webhook.url,
+      body,
+      { [SIGNATURE_HEADER]: signed.header },
+      cfg.NOTIFY_REQUEST_TIMEOUT_MS,
+    );
+  } catch (err) {
+    await writeAudit({
+      action: 'WEBHOOK_FAILED',
       entityType: 'Webhook',
       entityId: webhook.id,
-      changes: { event: job.event, url: webhook.url, status: res.status },
-    },
+      changes: { event: job.event, url: webhook.url, reason: (err as Error).message },
+    });
+    throw err;
+  }
+
+  await writeAudit({
+    action: 'WEBHOOK_DELIVERED',
+    entityType: 'Webhook',
+    entityId: webhook.id,
+    changes: { event: job.event, url: webhook.url, status: res.status },
   });
 
   log.info({ webhookId: webhook.id, event: job.event, status: res.status }, 'webhook delivered');

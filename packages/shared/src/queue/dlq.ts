@@ -1,7 +1,7 @@
 import type { Queue } from 'bullmq';
-import { prisma } from '../db.js';
 import { NotFoundError, ValidationError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import { writeAudit } from '../audit.js';
 import { paymentDlq, merchantNotifyDlq, enqueuePayment, enqueueNotify } from './queues.js';
 import { QUEUE_NAMES, type DeadLetter, type PaymentJob, type MerchantNotifyJob } from './types.js';
 
@@ -93,17 +93,15 @@ export async function reprocessDeadLetter(dlqName: string, id: string): Promise<
 
   await job.remove();
 
-  await prisma.auditLog.create({
-    data: {
-      action: 'DLQ_REPROCESSED',
-      entityType,
-      entityId,
-      changes: {
-        dlq: dlqName,
-        dlqJobId: id,
-        targetQueue: letter.queue,
-        originalJobId: letter.jobId ?? null,
-      },
+  await writeAudit({
+    action: 'DLQ_REPROCESSED',
+    entityType,
+    entityId,
+    changes: {
+      dlq: dlqName,
+      dlqJobId: id,
+      targetQueue: letter.queue,
+      originalJobId: letter.jobId ?? null,
     },
   });
 

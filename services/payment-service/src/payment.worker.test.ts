@@ -88,6 +88,13 @@ describe('processPaymentJob', () => {
     expect(payment?.status).toBe(PaymentStatus.SUCCESS);
     expect(payment?.completedAt).toBeTruthy();
     expect(payment?.attempts).toBe(1);
+
+    // T36: the provider call is audited (without the MSISDN in clear).
+    const c2bAudit = await prisma.auditLog.findFirst({
+      where: { action: 'C2B_REQUESTED', entityId: p.id },
+    });
+    expect(c2bAudit).not.toBeNull();
+    expect(JSON.stringify(c2bAudit?.changes)).not.toContain('258841234567');
   });
 
   test('declined: Payment + Transaction FAILED, no confirmedAt', async () => {

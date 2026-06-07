@@ -85,6 +85,12 @@ describe('confirmPayment — success', () => {
     const session = await prisma.session.findUnique({ where: { id: s.id } });
     expect(session?.status).toBe(SessionStatus.PROCESSING);
 
+    // T36: the payment initiation is audited.
+    const audit = await prisma.auditLog.findFirst({
+      where: { action: 'PAYMENT_INITIATED', entityId: res.paymentId },
+    });
+    expect(audit).not.toBeNull();
+
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({
       paymentId: res.paymentId,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { prisma, ValidationError, type RiskLevel } from '@coffepay/shared';
+import { prisma, writeAudit, ValidationError, type RiskLevel } from '@coffepay/shared';
 import { kycConfig } from './config.js';
 import { hashPhone, tryHashPhone } from './phone.js';
 import { decide, type KycReason } from './kyc.rules.js';
@@ -69,17 +69,15 @@ export async function evaluateKyc(input: EvaluateKycInput): Promise<KycResult> {
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      action: 'KYC_VALIDATED',
-      entityType: 'Client',
-      entityId: client.id,
-      changes: {
-        allowed: decision.allowed,
-        riskLevel: decision.riskLevel,
-        reasons: decision.reasons,
-        amountMZN,
-      },
+  await writeAudit({
+    action: 'KYC_VALIDATED',
+    entityType: 'Client',
+    entityId: client.id,
+    changes: {
+      allowed: decision.allowed,
+      riskLevel: decision.riskLevel,
+      reasons: decision.reasons,
+      amountMZN,
     },
   });
 

@@ -6,6 +6,7 @@ import {
   SessionStatus,
   hashPhone,
   enqueuePayment,
+  writeAudit,
   type PaymentJob,
 } from '@coffepay/shared';
 import { sessionConfig } from './config.js';
@@ -111,6 +112,13 @@ export async function confirmPayment(
     if (isUniqueViolation(err)) return replayExisting(sessionId, key);
     throw err;
   }
+
+  await writeAudit({
+    action: 'PAYMENT_INITIATED',
+    entityType: 'Payment',
+    entityId: payment.id,
+    changes: { sessionId, idempotencyKey: key },
+  });
 
   await transitionSession(sessionId, SessionStatus.PROCESSING);
 

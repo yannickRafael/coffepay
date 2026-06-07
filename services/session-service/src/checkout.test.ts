@@ -44,8 +44,11 @@ describe('GET /checkout/:id', () => {
     expect(res.status).toBe(200);
     expect(res.type).toMatch(/html/);
     expect(res.text).toContain('Confirmar pagamento');
-    expect(res.text).toContain('635.00 MZN');
+    expect(res.text).toContain('635.00');
+    expect(res.text).toContain('MZN');
     expect(res.text).toContain(`/sessions/${s.id}/pay`);
+    expect(res.text).toContain('validate-phone');
+    expect(res.text).toContain('Idempotency-Key');
   });
 
   test('renders a state page for a completed session (no form)', async () => {

@@ -1,7 +1,7 @@
 # CoffePay — Handoff / Estado do Projeto
 
-> Documento de continuidade. Última atualização: Fase 1–4 + T37/T38/T39/T42 concluídos
-> (47/49 issues, 96%). Restam só T40 (tese) e T41 (demo/screenshots).
+> Documento de continuidade. Última atualização: Fases 1–6 (settlement V2) concluídas.
+> 50/53 issues fechadas. Restam só T40 (tese, #47) e T41 (demo/screenshots, #48) — sem código.
 
 ## 1. O que é
 
@@ -144,6 +144,11 @@ Antes de commit: build + typecheck + lint + format:check todos limpos + testes v
 - **Fase 5 (polish) — feito:** T37(unit tests shared: mpesa session/crypto/phone/endpoints),
   T38(e2e: fluxo completo + ramos inválido/KYC/recusa/timeout/idempotência),
   T39(OpenAPI + Swagger UI no gateway `/docs`), T42(cleanup README+env, lint 0 warnings).
+- **Fase 6 (settlement, tese V2) ✅** T43(model Settlement + Transaction.settlementId FK),
+  T44(shared settleMerchant/runSettlements + settlement-service worker repetível +
+  admin /settlements/run|list), T45(testes + docs/compose/OpenAPI/ARCHITECTURE).
+  Liquidação periódica em USD: agrega SUCCESS não-liquidados, deduz taxa, idempotente
+  (1 tx → 1 settlement). 8 serviços agora (settlement-service novo).
 - **Ciclo demo completo end-to-end** (verificado a correr via compose): loja → Pay →
   checkout → awaiting+polling → resultado → redirect → confirmação merchant (webhook HMAC).
 - ATENÇÃO mapeamento: nº de issue ≠ T-id (T-id no título). Confirmar `gh issue view N`

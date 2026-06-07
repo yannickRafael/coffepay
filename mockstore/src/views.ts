@@ -37,6 +37,32 @@ export function renderProductPage(product: { name: string; priceUSD: number }): 
   );
 }
 
+/** Confirmation page shown when the customer returns from CoffePay (fig 28). */
+export function renderConfirmationPage(opts: {
+  status: string;
+  sessionId?: string;
+  amountMZN?: string;
+  fromWebhook: boolean;
+}): string {
+  const ok = opts.status === 'COMPLETED';
+  const heading = ok ? 'Pagamento concluído' : `Pagamento ${opts.status.toLowerCase()}`;
+  const amount = opts.amountMZN
+    ? `<p>Montante: <strong>${escapeHtml(opts.amountMZN)} MZN</strong></p>`
+    : '';
+  const source = opts.fromWebhook
+    ? '<p><small>Resultado confirmado pelo webhook assinado do CoffePay.</small></p>'
+    : '<p><small>Webhook ainda não recebido; estado obtido do redirect.</small></p>';
+  return page(
+    'Confirmação',
+    `<h1>Demo Store</h1>
+<h2>${escapeHtml(heading)}</h2>
+${opts.sessionId ? `<p>Sessão: <code>${escapeHtml(opts.sessionId)}</code></p>` : ''}
+${amount}
+${source}
+<p><a href="/">Voltar à loja</a></p>`,
+  );
+}
+
 /** Friendly error page when session creation fails. */
 export function renderErrorPage(message: string): string {
   return page(

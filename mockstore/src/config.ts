@@ -7,6 +7,8 @@ export interface MockstoreConfig {
   apiKey: string;
   /** Public base URL of this store, used to build the callback/return URL. */
   publicBaseUrl: string;
+  /** Shared HMAC secret to verify incoming CoffePay webhooks (T25/T28). */
+  webhookSecret: string;
   /** Demo product. */
   product: { name: string; priceUSD: number };
 }
@@ -21,6 +23,10 @@ export function mockstoreConfig(): MockstoreConfig {
     gatewayUrl: process.env.COFFEPAY_API_URL ?? process.env.GATEWAY_URL ?? 'http://localhost:3000',
     apiKey: process.env.MOCKSTORE_API_KEY ?? 'cp_dev_sk_demo_0001',
     publicBaseUrl: process.env.PUBLIC_BASE_URL ?? `http://localhost:${port}`,
+    webhookSecret:
+      process.env.MOCKSTORE_WEBHOOK_SECRET ??
+      process.env.WEBHOOK_SIGNING_SECRET ??
+      'dev-webhook-secret',
     product: { name: 'CoffePay Demo Mug', priceUSD: 10 },
   };
   return cached;

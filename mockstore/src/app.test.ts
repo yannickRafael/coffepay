@@ -1,6 +1,14 @@
 import request from 'supertest';
+import { signPayload, SIGNATURE_HEADER } from '@coffepay/shared';
 import { createApp } from './app.js';
 import type { CreateSessionFn } from './store.js';
+import { mockstoreConfig } from './config.js';
+import { clearEvents } from './events.js';
+
+const SECRET = () => mockstoreConfig().webhookSecret;
+const noop: CreateSessionFn = async () => ({ checkoutUrl: 'x' });
+
+beforeEach(() => clearEvents());
 
 describe('GET /', () => {
   test('renders the product page with a Pay with CoffePay button', async () => {
@@ -45,5 +53,80 @@ describe('POST /buy', () => {
     expect(res.type).toMatch(/html/);
     expect(res.text).toContain('Invalid API key');
     expect(res.text).toContain('Voltar à loja');
+  });
+});
+
+describe('POST /webhooks/coffepay', () => {
+  const body = JSON.stringify({
+    event: 'payment.success',
+    sessionId: 'sess-1',
+    paymentId: 'pay-1',
+    status: 'COMPLETED',
+    amountMZN: '635.00',
+  });
+
+  test('valid signature → 200 and the event is recorded', async () => {
+    const app = createApp({ createSession: noop });
+    const signed = signPayload(body, SECRET());
+
+    const res = await request(app)
+      .post('/webhooks/coffepay')
+      .set('Content-Type', 'application/json')
+      .set(SIGNATURE_HEADER, signed.header)
+      .send(body);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ received: true });
+
+    // The recorded event is now visible on the return page.
+    const ret = await request(app).get('/return?session=sess-1&status=COMPLETED');
+    expect(ret.text).toContain('Pagamento concluído');
+    expect(ret.text).toContain('635.00 MZN');
+    expect(ret.text).toContain('webhook assinado');
+  });
+
+  test('invalid signature → 401, event not recorded', async () => {
+    const app = createApp({ createSession: noop });
+
+    const res = await request(app)
+      .post('/webhooks/coffepay')
+      .set('Content-Type', 'application/json')
+      .set(SIGNATURE_HEADER, 't=1700000000,v1=deadbeef')
+      .send(body);
+
+    expect(res.status).toBe(401);
+  });
+
+  test('tampered body fails verification (HMAC over raw body)', async () => {
+    const app = createApp({ createSession: noop });
+    const signed = signPayload(body, SECRET());
+    const tampered = body.replace('635.00', '999.99');
+
+    const res = await request(app)
+      .post('/webhooks/coffepay')
+      .set('Content-Type', 'application/json')
+      .set(SIGNATURE_HEADER, signed.header)
+      .send(tampered);
+
+    expect(res.status).toBe(401);
+  });
+
+  test('missing signature header → 401', async () => {
+    const app = createApp({ createSession: noop });
+    const res = await request(app)
+      .post('/webhooks/coffepay')
+      .set('Content-Type', 'application/json')
+      .send(body);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('GET /return', () => {
+  test('falls back to the query status when no webhook arrived yet', async () => {
+    const app = createApp({ createSession: noop });
+    const res = await request(app).get('/return?session=unknown&status=FAILED');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Pagamento failed');
+    expect(res.text).toContain('redirect');
   });
 });

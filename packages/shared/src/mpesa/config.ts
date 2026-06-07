@@ -29,6 +29,12 @@ export const mpesaEnvSchema = z.object({
   MPESA_RETRY_BASE_DELAY_MS: z.coerce.number().int().positive().default(300),
   MPESA_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
   MPESA_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(30000),
+  // Connectivity-outage simulation (RNF04, T33): in mock mode, force a transient
+  // network failure so payment jobs are held in the queue and resume on recovery.
+  MPESA_SIMULATE_OUTAGE: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
 });
 
 export type MpesaEnv = z.infer<typeof mpesaEnvSchema>;

@@ -2,6 +2,7 @@ import {
   prisma,
   PaymentStatus,
   TransactionStatus,
+  ProviderError,
   type PaymentJob,
   type MpesaResult,
 } from '@coffepay/shared';
@@ -135,5 +136,45 @@ describe('processPaymentJob', () => {
       c2b: async () => okResult,
     });
     expect(out.skipped).toBe(true);
+  });
+});
+
+// T33: a provider outage holds the job in the queue (transient error → the
+// worker propagates it so BullMQ retries); on recovery the SAME job resumes to
+// success, with no double debit.
+describe('connectivity outage hold/resume (T33)', () => {
+  test('held during outage, resumes to success without double debit', async () => {
+    const p = await makePayment();
+    const j = job(p.id);
+
+    let providerUp = false;
+    const c2b = async () => {
+      if (!providerUp) throw new ProviderError('outage', { netCode: 'ECONNREFUSED' });
+      return okResult;
+    };
+
+    // Provider down: transient error propagates (held for retry).
+    await expect(processPaymentJob(j, { c2b })).rejects.toBeInstanceOf(ProviderError);
+
+    let payment = await prisma.payment.findUnique({ where: { id: p.id } });
+    expect(payment?.status).not.toBe(PaymentStatus.SUCCESS);
+    expect(payment?.status).not.toBe(PaymentStatus.FAILED); // still held
+    expect(payment?.attempts).toBe(1);
+
+    // Provider recovers: the same job resumes and completes.
+    providerUp = true;
+    const out = await processPaymentJob(j, { c2b });
+    expect(out.status).toBe(PaymentStatus.SUCCESS);
+
+    payment = await prisma.payment.findUnique({ where: { id: p.id } });
+    expect(payment?.status).toBe(PaymentStatus.SUCCESS);
+
+    // No double debit: exactly one transaction and one DEBIT ledger entry.
+    expect(await prisma.transaction.count({ where: { paymentId: p.id } })).toBe(1);
+    const tx = await prisma.transaction.findUnique({ where: { paymentId: p.id } });
+    const debits = await prisma.ledgerEntry.count({
+      where: { transactionId: tx!.id, entryType: 'DEBIT' },
+    });
+    expect(debits).toBe(1);
   });
 });

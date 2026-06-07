@@ -16,6 +16,32 @@ import { withResilience, type ResilienceOptions, type ResilienceDeps } from './r
 
 const log = createLogger({ module: 'mpesa-client' });
 
+// Runtime override for the connectivity-outage simulation (T33). When set, it
+// takes precedence over MPESA_SIMULATE_OUTAGE so a demo/test can toggle the
+// provider "down" then "up" within a single process.
+let mockOutageOverride: boolean | undefined;
+
+/** Turn the simulated outage on/off at runtime (mock mode only). */
+export function setSimulatedOutage(on: boolean): void {
+  mockOutageOverride = on;
+}
+
+/** Clear the runtime override; falls back to MPESA_SIMULATE_OUTAGE. */
+export function clearSimulatedOutage(): void {
+  mockOutageOverride = undefined;
+}
+
+function outageActive(cfg: MpesaEnv): boolean {
+  return mockOutageOverride ?? cfg.MPESA_SIMULATE_OUTAGE === true;
+}
+
+/** Transient failure thrown to simulate the provider being unreachable. */
+function simulatedOutageError(op: string): never {
+  throw new ProviderError(`M-Pesa ${op} unavailable (simulated outage)`, {
+    netCode: 'ECONNREFUSED',
+  });
+}
+
 /** Map config into retry/breaker tunables (RNF04, T31). */
 function resilienceOpts(cfg: MpesaEnv): ResilienceOptions {
   return {
@@ -113,7 +139,10 @@ export async function c2bPayment(
   if (!params.reference) throw new ValidationError('Missing reference');
   if (!params.thirdPartyReference) throw new ValidationError('Missing thirdPartyReference');
 
-  if (isMockMode(cfg)) return mockC2B(params, msisdn);
+  if (isMockMode(cfg)) {
+    if (outageActive(cfg)) simulatedOutageError('c2bPayment');
+    return mockC2B(params, msisdn);
+  }
 
   // Retries reuse the same reference/thirdPartyReference so the provider can
   // deduplicate (no double debit — RNF05, T32).
@@ -152,6 +181,7 @@ export async function queryTransactionStatus(
   if (!params.queryReference) throw new ValidationError('Missing queryReference');
 
   if (isMockMode(cfg)) {
+    if (outageActive(cfg)) simulatedOutageError('queryTransactionStatus');
     return normalize({
       output_ResponseCode: MPESA_SUCCESS_CODE,
       output_ResponseDesc: 'Completed (mock)',

@@ -51,6 +51,23 @@ ngrok http 4000                       # devolve um URL https://<id>.ngrok-free.a
 - O cliente regressa a `GET <url>/return?session=&status=` (T26); a página de
   confirmação usa o resultado do webhook se já tiver chegado.
 
+## Simular falha de conectividade (T33)
+
+Em modo mock, é possível simular o Vodacom OpenAPI indisponível para demonstrar
+que os pagamentos ficam retidos na fila e retomam quando o provider volta (RNF04),
+sem débito duplo (RNF05).
+
+- **Por ambiente** (estático): `MPESA_SIMULATE_OUTAGE=true` no `.env` → o cliente
+  M-Pesa lança erro de rede transitório; os jobs re-tentam (BullMQ backoff) e a
+  sessão fica `PROCESSING`. Voltar a `false` (e reiniciar) → o próximo job sucede.
+- **Em runtime** (demo/teste): `setSimulatedOutage(true)` / `clearSimulatedOutage()`
+  de `@coffepay/shared` ligam/desligam a falha dentro do mesmo processo.
+- Se a falha durar além de `PAYMENT_TIMEOUT_MS`, o sweeper (RF08, T22) marca a
+  sessão `FAILED` — comportamento esperado.
+
+Provado automaticamente em `services/payment-service/src/payment.worker.test.ts`
+(hold→resume sem débito duplo) e `packages/shared/src/mpesa/outage.test.ts`.
+
 ## Notas
 
 - Dados persistem em volumes nomeados (`postgres-data`, `redis-data`).

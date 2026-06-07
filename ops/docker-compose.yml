@@ -169,6 +169,19 @@ services:
       redis:
         condition: service_healthy
 
+  settlement-service:
+    <<: *app-build
+    container_name: coffepay-settlement-service
+    command: node services/settlement-service/dist/index.js
+    environment:
+      <<: *app-env
+      SETTLEMENT_INTERVAL_MS: ${SETTLEMENT_INTERVAL_MS:-3600000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
   mockstore:
     <<: *app-build
     container_name: coffepay-mockstore

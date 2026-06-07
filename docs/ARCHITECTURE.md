@@ -55,6 +55,7 @@ flowchart LR
 | `kyc-service`          | KYC/AML activo (regras) e passivo (risco por histórico)                        | PostgreSQL        |
 | `fx-service`           | Conversão MZN↔USD com spread; cache de taxas                                   | Redis             |
 | `notification-service` | Webhook assinado (HMAC) ao merchant; retry + DLQ                               | Redis             |
+| `settlement-service`   | Liquidação periódica ao merchant em USD (agrega, deduz taxa); job repetível    | PostgreSQL, Redis |
 
 `packages/shared`: Prisma Client (singleton), logger (pino), erros (`AppError`),
 config (zod), e — nas fases seguintes — cliente M-Pesa e crypto/HMAC.
@@ -83,6 +84,10 @@ config (zod), e — nas fases seguintes — cliente M-Pesa e crypto/HMAC.
    `LedgerEntry` e `AuditLog`, e enfileira a notificação.
 5. O `notification-service` envia um **webhook assinado (HMAC)** ao merchant e o
    utilizador é redireccionado de volta à loja com a confirmação.
+6. **Liquidação (assíncrona, periódica):** o `settlement-service` agrega as
+   transacções confirmadas e ainda não liquidadas por merchant, deduz a taxa de
+   serviço, converte o líquido para USD e regista um `Settlement` (transferência
+   simulada). Idempotente — cada transacção entra em exactamente um `Settlement`.
 
 Detalhe na fig. 25 (diagrama de sequência) da tese.
 

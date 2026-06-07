@@ -19,6 +19,7 @@ Monorepo (npm workspaces) com microserviços:
 | `kyc-service`          | Validação KYC/AML (activa e passiva)                                   |
 | `fx-service`           | Conversão cambial USD→MZN com spread, cache em Redis                   |
 | `notification-service` | Worker: webhooks assinados (HMAC) para o merchant, retry e DLQ         |
+| `settlement-service`   | Worker: liquidação periódica ao merchant em USD (agrega, deduz taxa)   |
 
 Pastas adicionais:
 
@@ -89,7 +90,8 @@ documentadas em [`.env.example`](.env.example); detalhe da infra em
 
 Implementação funcional ponta-a-ponta: criação de sessão, checkout, KYC, C2B
 (mock/real), ledger de dupla entrada, notificação por webhook assinado com
-retry/DLQ, resiliência (circuit breaker, retry, idempotência) e auditoria.
+retry/DLQ, resiliência (circuit breaker, retry, idempotência), liquidação
+periódica ao merchant em USD e auditoria.
 Tarefas, prioridades e fases no
 [board Kanban](https://github.com/users/yannickRafael/projects/4); cada commit
 fecha a issue correspondente (`Closes #N`).

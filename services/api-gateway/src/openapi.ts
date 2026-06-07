@@ -138,5 +138,23 @@ export const openapiDocument = {
         },
       },
     },
+    '/admin/settlements/run': {
+      post: {
+        summary: 'Run the periodic merchant settlement on-demand (operational)',
+        security: [{ AdminKey: [] }],
+        responses: {
+          '200': { description: 'Settlements processed' },
+          '401': { description: 'Denied' },
+        },
+      },
+    },
+    '/admin/settlements': {
+      get: {
+        summary: 'List settlements (operational)',
+        security: [{ AdminKey: [] }],
+        parameters: [{ name: 'merchantId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: 'Settlements' }, '401': { description: 'Denied' } },
+      },
+    },
   },
 } as const;

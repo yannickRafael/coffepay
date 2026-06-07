@@ -1,6 +1,7 @@
 # CoffePay — Handoff / Estado do Projeto
 
-> Documento de continuidade. Última atualização: T25 concluído (31/49 issues, 63%).
+> Documento de continuidade. Última atualização: Fase 1–4 + T37/T38/T39/T42 concluídos
+> (47/49 issues, 96%). Restam só T40 (tese) e T41 (demo/screenshots).
 
 ## 1. O que é
 
@@ -125,32 +126,41 @@ npm run format / format:check
 
 Antes de commit: build + typecheck + lint + format:check todos limpos + testes verdes.
 
-## 9. Progresso (37/49 fechadas, 76%)
+## 9. Progresso (47/49 fechadas, 96%)
 
 - **Fase 1 (setup) ✅** T01–T07: monorepo, prisma, shared, mpesa client, HMAC, BullMQ, CI.
 - **Fase 2 (core) ✅** T08–T18 + testes T12b/T14b/T15b/T17b: FX, gateway+auth, sessions,
   lifecycle, KYC ativo+passivo.
 - **Fase 3 (integração) ✅** T19(checkout), T20+T20b(pay+idempotency),
   T21(worker pagamento), T22(timeout), T23+T23b(result handler+autenticidade),
-  T24(ledger), T25(notificação), T25b(testes notificação), T26(redirect→merchant),
+  T24(ledger), T25(notificação), T25b(testes), T26(redirect→merchant),
   T27(mockstore produto+Pay), T28(mockstore webhook receiver+confirmação),
-  T29(checkout UI validação+pay), T30(checkout polling+estados terminais).
-- **Ciclo demo completo end-to-end**: loja → Pay → checkout (validação+pay) →
-  awaiting+polling → resultado → redirect → confirmação merchant (webhook verificado).
+  T29(checkout UI), T30(checkout polling+estados terminais).
+- **Fase 4 (resiliência) ✅** T31(circuit breaker+retry mpesa client),
+  T32(idempotência forte: race P2002→replay, refs determinísticas),
+  T33(simulação outage + hold/resume na fila), T34(DLQ inspect+reprocesso admin),
+  T35(docker-compose completo: 1 imagem, 7 serviços+mockstore+migrate+ngrok, VERIFICADO),
+  T36(helper writeAudit + trilho completo).
+- **Fase 5 (polish) — feito:** T37(unit tests shared: mpesa session/crypto/phone/endpoints),
+  T38(e2e: fluxo completo + ramos inválido/KYC/recusa/timeout/idempotência),
+  T39(OpenAPI + Swagger UI no gateway `/docs`), T42(cleanup README+env, lint 0 warnings).
+- **Ciclo demo completo end-to-end** (verificado a correr via compose): loja → Pay →
+  checkout → awaiting+polling → resultado → redirect → confirmação merchant (webhook HMAC).
 - ATENÇÃO mapeamento: nº de issue ≠ T-id (T-id no título). Confirmar `gh issue view N`
-  ANTES do `Closes #N` — já houve troca (#34/#35) que foi corrigida via gh.
+  ANTES do `Closes #N` — já houve troca (#34/#35) corrigida via gh; #38 fora reaberto.
 
 ## 10. PRÓXIMO PASSO
 
-**Fase 4 (resiliência), #38 / T31** — circuit breaker + retry exponential backoff no
-M-Pesa client (RNF04). Detalhar a issue ANTES de implementar (Fase 4/5 = just-in-time,
-ainda SEM descrição detalhada).
+Só restam **2 issues, ambas SEM código no repo** (paradas a pedido do utilizador):
 
-### Fase 4 (resiliência) #38–43 / Fase 5 (polish) #44–49
+- **#47 / T40** — atualizar o Cap V da tese (documento PDF/Word, fora do repo). Posso
+  gerar conteúdo/`docs/capitulo-v.md` se pedido.
+- **#48 / T41** — script de demo + screenshots p/ defesa. Posso escrever `ops/demo.sh`;
+  os screenshots são captura manual a correr o stack.
 
-T31 circuit breaker, T32 idempotência forte, T33 falha/retoma, T34 DLQ inspect,
-T35 compose completo+ngrok, T36 auditLog completo, T37 unit shared, T38 e2e,
-T39 swagger, T40 atualizar Cap V tese, T41 demo, T42 cleanup. (detalhar just-in-time)
+Verificações finais limpas: build + typecheck + lint (**0 warnings**) + format + testes
+verdes por serviço. Stack completo arranca com `docker compose -f ops/docker-compose.yml
+up --build -d`; docs em `/docs`; demo em `http://localhost:4000`.
 
 ## 11. Mapeamento issue↔task
 

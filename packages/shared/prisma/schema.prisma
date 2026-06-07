@@ -48,6 +48,13 @@ enum RiskLevel {
   HIGH
 }
 
+enum SettlementStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 // ----------------------------- Models ----------------------------
 
 model Merchant {
@@ -58,9 +65,10 @@ model Merchant {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  sessions Session[]
-  apiKeys  ApiKey[]
-  webhooks Webhook[]
+  sessions    Session[]
+  apiKeys     ApiKey[]
+  webhooks    Webhook[]
+  settlements Settlement[]
 
   @@map("merchants")
 }
@@ -153,10 +161,10 @@ model Payment {
   completedAt    DateTime?
   updatedAt      DateTime      @updatedAt
 
-  session       Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  client        Client          @relation(fields: [clientId], references: [id])
-  transaction   Transaction?
-  idempotency   IdempotencyKey?
+  session     Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  client      Client          @relation(fields: [clientId], references: [id])
+  transaction Transaction?
+  idempotency IdempotencyKey?
 
   @@index([clientId])
   @@index([status])
@@ -192,21 +200,48 @@ model IdempotencyKey {
 }
 
 model Transaction {
-  id          String            @id @default(uuid()) @db.Uuid
-  paymentId   String            @unique @db.Uuid
-  amountMZN   Decimal           @db.Decimal(18, 2)
-  status      TransactionStatus
-  processedAt DateTime?
-  confirmedAt DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id           String            @id @default(uuid()) @db.Uuid
+  paymentId    String            @unique @db.Uuid
+  amountMZN    Decimal           @db.Decimal(18, 2)
+  status       TransactionStatus
+  processedAt  DateTime?
+  confirmedAt  DateTime?
+  // Set when this transaction is included in a periodic settlement (T43).
+  // A transaction belongs to at most one settlement (idempotent settlement).
+  settlementId String?           @db.Uuid
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   payment          Payment           @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  settlement       Settlement?       @relation(fields: [settlementId], references: [id], onDelete: SetNull)
   providerRequests ProviderRequest[]
   ledgerEntries    LedgerEntry[]
   auditLogs        AuditLog[]
 
+  @@index([settlementId])
   @@map("transactions")
+}
+
+model Settlement {
+  id           String           @id @default(uuid()) @db.Uuid
+  merchantId   String           @db.Uuid
+  amountMZN    Decimal          @db.Decimal(18, 2)
+  amountUSD    Decimal          @db.Decimal(18, 2)
+  fxRate       Decimal          @db.Decimal(18, 6)
+  feesDeducted Decimal          @db.Decimal(18, 2)
+  status       SettlementStatus @default(PENDING)
+  periodStart  DateTime
+  periodEnd    DateTime
+  processedAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  merchant     Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@map("settlements")
 }
 
 model ProviderRequest {

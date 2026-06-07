@@ -1,6 +1,7 @@
 /** @type {import('jest').Config} */
 export default {
   testEnvironment: 'node',
+  passWithNoTests: true,
   extensionsToTreatAsEsm: ['.ts'],
   setupFiles: ['<rootDir>/jest.setup.mjs'],
   moduleNameMapper: {

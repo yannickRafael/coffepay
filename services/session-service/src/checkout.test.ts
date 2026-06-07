@@ -51,6 +51,17 @@ describe('GET /checkout/:id', () => {
     expect(res.text).toContain('Idempotency-Key');
   });
 
+  test('payable page wires polling and the return redirect (T30)', async () => {
+    const s = await makeSession(SessionStatus.PENDING, future());
+    const res = await request(app).get(`/checkout/${s.id}`);
+    expect(res.status).toBe(200);
+    // Polls the public session endpoint and routes terminal states to /return.
+    expect(res.text).toContain(`/sessions/${s.id}`);
+    expect(res.text).toContain("'/checkout/' + sid + '/return'");
+    expect(res.text).toContain('startPolling');
+    expect(res.text).toContain('A aguardar confirmação');
+  });
+
   test('renders a state page for a completed session (no form)', async () => {
     const s = await makeSession(SessionStatus.COMPLETED, future());
     const res = await request(app).get(`/checkout/${s.id}`);

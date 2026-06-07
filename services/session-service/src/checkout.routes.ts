@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { isAppError } from '@coffepay/shared';
 import { getPublicSession, getReturnTarget } from './session.service.js';
 import { renderCheckoutPage, renderStatePage, renderNotFound } from './checkout.view.js';
+import { sessionConfig } from './config.js';
 
 export const checkoutRouter = Router();
 
@@ -27,7 +28,13 @@ checkoutRouter.get('/:id', async (req: Request, res: Response, next: NextFunctio
   try {
     const session = await getPublicSession(req.params.id ?? '');
     const payable = session.status === 'PENDING' && !session.expired;
-    const html = payable ? renderCheckoutPage(session) : renderStatePage(session);
+    const cfg = sessionConfig();
+    const html = payable
+      ? renderCheckoutPage(session, {
+          pollIntervalMs: cfg.CHECKOUT_POLL_INTERVAL_MS,
+          pollTimeoutMs: cfg.CHECKOUT_POLL_TIMEOUT_MS,
+        })
+      : renderStatePage(session);
     res.status(200).type('html').send(html);
   } catch (err) {
     if (isAppError(err) && err.httpStatus === 404) {

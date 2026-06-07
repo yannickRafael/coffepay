@@ -52,8 +52,18 @@ ${script}
 </html>`;
 }
 
+export interface CheckoutPollOptions {
+  pollIntervalMs: number;
+  pollTimeoutMs: number;
+}
+
+const DEFAULT_POLL: CheckoutPollOptions = { pollIntervalMs: 3000, pollTimeoutMs: 150000 };
+
 /** Checkout form for a payable (PENDING, not expired) session — RF03 / RNF08. */
-export function renderCheckoutPage(s: PublicSession): string {
+export function renderCheckoutPage(
+  s: PublicSession,
+  poll: CheckoutPollOptions = DEFAULT_POLL,
+): string {
   const sid = escapeHtml(s.sessionId);
   const body = `<div class="brand">CoffePay</div>
 <div class="card" data-session-id="${sid}">
@@ -77,10 +87,77 @@ export function renderCheckoutPage(s: PublicSession): string {
   var phone = document.getElementById('phone');
   var err = document.getElementById('phone-error');
   var btn = document.getElementById('submit-btn');
+  var main = document.querySelector('main');
   var sid = ${JSON.stringify(s.sessionId)};
+  var returnUrl = '/checkout/' + sid + '/return';
+  var pollInterval = ${JSON.stringify(poll.pollIntervalMs)};
+  var pollTimeout = ${JSON.stringify(poll.pollTimeoutMs)};
   var idemKey = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 
   function showError(m) { err.textContent = m || ''; }
+
+  function screen(html) { main.innerHTML = '<div class="brand">CoffePay</div>' + html; }
+
+  // Awaiting (fig 31): tell the user to approve on their phone, then poll.
+  function showAwaiting() {
+    screen(
+      '<div class="card"><p class="state">A aguardar confirmação…</p>' +
+      '<p class="usd">Aprove o pagamento no seu telemóvel (M-Pesa).</p>' +
+      '<p class="expires" id="poll-note">A verificar o estado…</p></div>'
+    );
+  }
+
+  // Terminal result (figs 32-33): show outcome and send the user back to the store.
+  function showResult(status) {
+    if (status === 'COMPLETED') {
+      screen(
+        '<div class="card"><p class="state">Pagamento concluído ✓</p>' +
+        '<p class="usd">A redirecionar para a loja…</p>' +
+        '<button id="go">Voltar à loja</button></div>'
+      );
+    } else if (status === 'EXPIRED') {
+      screen(
+        '<div class="card"><p class="state">Sessão expirada</p>' +
+        '<p class="usd">O tempo para pagar terminou. Recomece a compra na loja.</p>' +
+        '<button id="go">Voltar à loja</button></div>'
+      );
+    } else {
+      screen(
+        '<div class="card"><p class="state">Pagamento não concluído</p>' +
+        '<p class="usd">O pagamento falhou. Pode tentar novamente a partir da loja.</p>' +
+        '<button id="go">Voltar à loja</button></div>'
+      );
+    }
+    var go = document.getElementById('go');
+    if (go) { go.addEventListener('click', function () { window.location.href = returnUrl; }); }
+    // Auto-redirect shortly after, leaving time to read the message.
+    setTimeout(function () { window.location.href = returnUrl; }, 2500);
+  }
+
+  function isTerminal(status) {
+    return status === 'COMPLETED' || status === 'FAILED' || status === 'EXPIRED';
+  }
+
+  function startPolling() {
+    var deadline = Date.now() + pollTimeout;
+    function tick() {
+      fetch('/sessions/' + sid, { headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) {
+          var status = s ? (s.expired ? 'EXPIRED' : s.status) : null;
+          if (status && isTerminal(status)) { showResult(status); return; }
+          if (Date.now() >= deadline) {
+            var note = document.getElementById('poll-note');
+            if (note) { note.textContent = 'Demora mais do que o esperado. '; }
+            showResult('FAILED');
+            return;
+          }
+          setTimeout(tick, pollInterval);
+        })
+        .catch(function () { setTimeout(tick, pollInterval); });
+    }
+    setTimeout(tick, pollInterval);
+  }
 
   async function validatePhone() {
     showError('');
@@ -117,13 +194,7 @@ export function renderCheckoutPage(s: PublicSession): string {
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idemKey },
         body: JSON.stringify({ phone: phone.value.trim() }),
       });
-      if (r.status === 202) {
-        document.querySelector('main').innerHTML =
-          '<div class="brand">CoffePay</div>' +
-          '<div class="card"><p class="state">A aguardar confirmação…</p>' +
-          '<p class="usd">Aprove o pagamento no seu telemóvel (M-Pesa).</p></div>';
-        return;
-      }
+      if (r.status === 202) { showAwaiting(); startPolling(); return; }
       var b = await r.json().catch(function () { return {}; });
       showError(b.message || 'Não foi possível iniciar o pagamento.');
       btn.disabled = false;

@@ -15,6 +15,11 @@ const sessionEnvSchema = baseEnvSchema.extend({
   // not confirmed within this window is failed.
   PAYMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
   PAYMENT_TIMEOUT_SWEEP_MS: z.coerce.number().int().positive().default(30000),
+  // Client-side checkout polling (T30): how often to poll GET /sessions/:id and
+  // when to give up. Timeout should be >= PAYMENT_TIMEOUT_MS so the server-side
+  // sweep (RF08) can mark the session FAILED before the client stops polling.
+  CHECKOUT_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
+  CHECKOUT_POLL_TIMEOUT_MS: z.coerce.number().int().positive().default(150000),
 });
 
 export type SessionConfig = z.infer<typeof sessionEnvSchema>;

@@ -125,33 +125,26 @@ npm run format / format:check
 
 Antes de commit: build + typecheck + lint + format:check todos limpos + testes verdes.
 
-## 9. Progresso (32/49 fechadas, 65%)
+## 9. Progresso (37/49 fechadas, 76%)
 
 - **Fase 1 (setup) ✅** T01–T07: monorepo, prisma, shared, mpesa client, HMAC, BullMQ, CI.
 - **Fase 2 (core) ✅** T08–T18 + testes T12b/T14b/T15b/T17b: FX, gateway+auth, sessions,
   lifecycle, KYC ativo+passivo.
-- **Fase 3 (integração)** — feito: T19(checkout), T20+T20b(pay+idempotency),
+- **Fase 3 (integração) ✅** T19(checkout), T20+T20b(pay+idempotency),
   T21(worker pagamento), T22(timeout), T23+T23b(result handler+autenticidade),
-  T24(ledger), T25(notificação), **T25b(testes notificação)**.
-- TODAS as issues da Fase 3 (#26–#37) já têm descrição detalhada escrita.
+  T24(ledger), T25(notificação), T25b(testes notificação), T26(redirect→merchant),
+  T27(mockstore produto+Pay), T28(mockstore webhook receiver+confirmação),
+  T29(checkout UI validação+pay), T30(checkout polling+estados terminais).
+- **Ciclo demo completo end-to-end**: loja → Pay → checkout (validação+pay) →
+  awaiting+polling → resultado → redirect → confirmação merchant (webhook verificado).
+- ATENÇÃO mapeamento: nº de issue ≠ T-id (T-id no título). Confirmar `gh issue view N`
+  ANTES do `Closes #N` — já houve troca (#34/#35) que foi corrigida via gh.
 
 ## 10. PRÓXIMO PASSO
 
-**#33 / T26** — redirect cliente→merchant com estado pós-pagamento (RF18). Fecha o
-ciclo visível: depois do resultado (COMPLETED/FAILED/EXPIRED) o checkout reenvia o
-cliente para o `callbackUrl`/`returnUrl` do merchant com o estado da sessão.
-
-- Issue #33 já tem descrição detalhada (`gh issue view 33`).
-- Ler primeiro a página de estado do checkout (`session-service` checkout.view.ts) e
-  como o `callbackUrl` é guardado na Session.
-
-### Fase 3 restante depois de T26
-
-- #33 T26 — redirect cliente→merchant com estado (RF18)
-- #34 T27 — mockstore: produto + Pay with CoffePay → cria sessão (fig27)
-- #35 T28 — mockstore: receptor webhook (verifica HMAC) + confirmação (fig28)
-- #36 T29 — checkout UI: nº+MZN+validação (figs29-30, RNF08)
-- #37 T30 — checkout UI: estados awaiting/failed/invalid + polling (figs31-33)
+**Fase 4 (resiliência), #38 / T31** — circuit breaker + retry exponential backoff no
+M-Pesa client (RNF04). Detalhar a issue ANTES de implementar (Fase 4/5 = just-in-time,
+ainda SEM descrição detalhada).
 
 ### Fase 4 (resiliência) #38–43 / Fase 5 (polish) #44–49
 

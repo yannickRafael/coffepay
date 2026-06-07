@@ -1,5 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import helmet from 'helmet';
+import swaggerUi from 'swagger-ui-express';
+import { openapiDocument } from './openapi.js';
 import { requestId } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createRateLimiter } from './middleware/rateLimit.js';
@@ -19,6 +21,10 @@ export function createApp(cfg: GatewayConfig = gatewayConfig()) {
 
   // Health is not rate-limited.
   app.get('/health', (_req: Request, res: Response) => res.json({ status: 'ok' }));
+
+  // API docs (T39) — not authenticated, not rate-limited.
+  app.get('/openapi.json', (_req: Request, res: Response) => res.json(openapiDocument));
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiDocument));
 
   app.use(createRateLimiter({ windowMs: cfg.RATE_LIMIT_WINDOW_MS, max: cfg.RATE_LIMIT_MAX }));
 

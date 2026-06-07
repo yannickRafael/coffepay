@@ -22,6 +22,13 @@ export const mpesaEnvSchema = z.object({
     .optional()
     .transform((v) => v === 'true'),
   MPESA_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  // Resilience (RNF04, T31). Retry only transient errors (timeout/network/5xx)
+  // with exponential backoff; a per-operation circuit breaker fails fast when
+  // the provider is down.
+  MPESA_RETRY_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  MPESA_RETRY_BASE_DELAY_MS: z.coerce.number().int().positive().default(300),
+  MPESA_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
+  MPESA_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(30000),
 });
 
 export type MpesaEnv = z.infer<typeof mpesaEnvSchema>;

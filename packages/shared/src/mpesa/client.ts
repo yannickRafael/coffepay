@@ -12,8 +12,19 @@ import {
   type MpesaResult,
   type MpesaRawResponse,
 } from './types.js';
+import { withResilience, type ResilienceOptions, type ResilienceDeps } from './resilience.js';
 
 const log = createLogger({ module: 'mpesa-client' });
+
+/** Map config into retry/breaker tunables (RNF04, T31). */
+function resilienceOpts(cfg: MpesaEnv): ResilienceOptions {
+  return {
+    maxAttempts: cfg.MPESA_RETRY_MAX_ATTEMPTS,
+    baseDelayMs: cfg.MPESA_RETRY_BASE_DELAY_MS,
+    failureThreshold: cfg.MPESA_BREAKER_FAILURE_THRESHOLD,
+    cooldownMs: cfg.MPESA_BREAKER_COOLDOWN_MS,
+  };
+}
 
 /**
  * Validate and normalize a Mozambican MSISDN to 258XXXXXXXXX.
@@ -95,6 +106,7 @@ function mockC2B(p: C2BParams, msisdn: string): MpesaResult {
 export async function c2bPayment(
   params: C2BParams,
   cfg: MpesaEnv = loadMpesaConfig(),
+  deps: ResilienceDeps = {},
 ): Promise<MpesaResult> {
   const msisdn = normalizeMsisdn(params.msisdn);
   const amount = assertAmount(params.amount);
@@ -103,29 +115,39 @@ export async function c2bPayment(
 
   if (isMockMode(cfg)) return mockC2B(params, msisdn);
 
-  try {
-    const res = await axios.post<MpesaRawResponse>(
-      mpesaUrl(cfg, 'c2b'),
-      {
-        input_ServiceProviderCode: cfg.MPESA_SERVICE_PROVIDER_CODE,
-        input_CustomerMSISDN: msisdn,
-        input_Amount: amount,
-        input_TransactionReference: params.reference,
-        input_ThirdPartyReference: params.thirdPartyReference,
-      },
-      { timeout: cfg.MPESA_REQUEST_TIMEOUT_MS, headers: headers(cfg) },
-    );
-    log.info({ ref: params.reference, code: res.data.output_ResponseCode }, 'C2B response');
-    return normalize(res.data);
-  } catch (err) {
-    return toAppError(err, 'c2bPayment');
-  }
+  // Retries reuse the same reference/thirdPartyReference so the provider can
+  // deduplicate (no double debit — RNF05, T32).
+  return withResilience(
+    'c2bPayment',
+    async () => {
+      try {
+        const res = await axios.post<MpesaRawResponse>(
+          mpesaUrl(cfg, 'c2b'),
+          {
+            input_ServiceProviderCode: cfg.MPESA_SERVICE_PROVIDER_CODE,
+            input_CustomerMSISDN: msisdn,
+            input_Amount: amount,
+            input_TransactionReference: params.reference,
+            input_ThirdPartyReference: params.thirdPartyReference,
+          },
+          { timeout: cfg.MPESA_REQUEST_TIMEOUT_MS, headers: headers(cfg) },
+        );
+        log.info({ ref: params.reference, code: res.data.output_ResponseCode }, 'C2B response');
+        return normalize(res.data);
+      } catch (err) {
+        return toAppError(err, 'c2bPayment');
+      }
+    },
+    resilienceOpts(cfg),
+    deps,
+  );
 }
 
 /** Query the status of a previous transaction. */
 export async function queryTransactionStatus(
   params: QueryParams,
   cfg: MpesaEnv = loadMpesaConfig(),
+  deps: ResilienceDeps = {},
 ): Promise<MpesaResult> {
   if (!params.queryReference) throw new ValidationError('Missing queryReference');
 
@@ -138,26 +160,34 @@ export async function queryTransactionStatus(
     });
   }
 
-  try {
-    const res = await axios.get<MpesaRawResponse>(mpesaUrl(cfg, 'query'), {
-      timeout: cfg.MPESA_REQUEST_TIMEOUT_MS,
-      headers: headers(cfg),
-      params: {
-        input_ServiceProviderCode: cfg.MPESA_SERVICE_PROVIDER_CODE,
-        input_QueryReference: params.queryReference,
-        input_ThirdPartyReference: params.thirdPartyReference,
-      },
-    });
-    return normalize(res.data);
-  } catch (err) {
-    return toAppError(err, 'queryTransactionStatus');
-  }
+  return withResilience(
+    'queryTransactionStatus',
+    async () => {
+      try {
+        const res = await axios.get<MpesaRawResponse>(mpesaUrl(cfg, 'query'), {
+          timeout: cfg.MPESA_REQUEST_TIMEOUT_MS,
+          headers: headers(cfg),
+          params: {
+            input_ServiceProviderCode: cfg.MPESA_SERVICE_PROVIDER_CODE,
+            input_QueryReference: params.queryReference,
+            input_ThirdPartyReference: params.thirdPartyReference,
+          },
+        });
+        return normalize(res.data);
+      } catch (err) {
+        return toAppError(err, 'queryTransactionStatus');
+      }
+    },
+    resilienceOpts(cfg),
+    deps,
+  );
 }
 
 /** Reverse a previous transaction. Requires initiator + security credential. */
 export async function reversal(
   params: ReversalParams,
   cfg: MpesaEnv = loadMpesaConfig(),
+  deps: ResilienceDeps = {},
 ): Promise<MpesaResult> {
   const amount = assertAmount(params.amount);
   if (!params.transactionId) throw new ValidationError('Missing transactionId');
@@ -177,21 +207,28 @@ export async function reversal(
     );
   }
 
-  try {
-    const res = await axios.put<MpesaRawResponse>(
-      mpesaUrl(cfg, 'reversal'),
-      {
-        input_ReversalAmount: amount,
-        input_TransactionID: params.transactionId,
-        input_ThirdPartyReference: params.thirdPartyReference,
-        input_ServiceProviderCode: cfg.MPESA_SERVICE_PROVIDER_CODE,
-        input_InitiatorIdentifier: cfg.MPESA_INITIATOR_IDENTIFIER,
-        input_SecurityCredential: cfg.MPESA_SECURITY_CREDENTIAL,
-      },
-      { timeout: cfg.MPESA_REQUEST_TIMEOUT_MS, headers: headers(cfg) },
-    );
-    return normalize(res.data);
-  } catch (err) {
-    return toAppError(err, 'reversal');
-  }
+  return withResilience(
+    'reversal',
+    async () => {
+      try {
+        const res = await axios.put<MpesaRawResponse>(
+          mpesaUrl(cfg, 'reversal'),
+          {
+            input_ReversalAmount: amount,
+            input_TransactionID: params.transactionId,
+            input_ThirdPartyReference: params.thirdPartyReference,
+            input_ServiceProviderCode: cfg.MPESA_SERVICE_PROVIDER_CODE,
+            input_InitiatorIdentifier: cfg.MPESA_INITIATOR_IDENTIFIER,
+            input_SecurityCredential: cfg.MPESA_SECURITY_CREDENTIAL,
+          },
+          { timeout: cfg.MPESA_REQUEST_TIMEOUT_MS, headers: headers(cfg) },
+        );
+        return normalize(res.data);
+      } catch (err) {
+        return toAppError(err, 'reversal');
+      }
+    },
+    resilienceOpts(cfg),
+    deps,
+  );
 }

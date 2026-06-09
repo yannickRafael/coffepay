@@ -3,14 +3,27 @@ name: coffepay
 # Common environment shared by all app services. Internal traffic uses the
 # compose service names; CHECKOUT_BASE_URL / PUBLIC_BASE_URL are host-facing
 # (the customer's browser) so they use localhost ports.
+# App config comes entirely from .env (see .env.example) — no hardcoded values
+# here. Only infra wiring stays literal: the Postgres/Redis hostnames and the
+# :5432/:6379 ports are the compose network topology (container-internal), not
+# tunable config, so DATABASE_URL/REDIS_URL are composed from the .env
+# credentials but target the compose service names (not the .env localhost URLs).
 x-app-env: &app-env
-  NODE_ENV: production
-  DATABASE_URL: postgresql://${POSTGRES_USER:-coffepay}:${POSTGRES_PASSWORD:-coffepay}@postgres:5432/${POSTGRES_DB:-coffepay}
+  NODE_ENV: ${NODE_ENV}
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
   REDIS_URL: redis://redis:6379
-  JWT_SECRET: ${JWT_SECRET:-change-me-dev-only}
-  WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-change-me-dev-only}
-  MPESA_MOCK: 'true'
-  LOG_LEVEL: ${LOG_LEVEL:-info}
+  JWT_SECRET: ${JWT_SECRET}
+  WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET}
+  # M-Pesa: set MPESA_MOCK=false in .env AND provide both MPESA_API_KEY +
+  # MPESA_PUBLIC_KEY to hit the real Vodacom OpenAPI; without the keys the client
+  # falls back to mock regardless (see shared isMockMode()).
+  MPESA_MOCK: ${MPESA_MOCK}
+  MPESA_API_KEY: ${MPESA_API_KEY}
+  MPESA_PUBLIC_KEY: ${MPESA_PUBLIC_KEY}
+  MPESA_API_HOST: ${MPESA_API_HOST}
+  MPESA_ORIGIN: ${MPESA_ORIGIN}
+  MPESA_SERVICE_PROVIDER_CODE: ${MPESA_SERVICE_PROVIDER_CODE}
+  LOG_LEVEL: ${LOG_LEVEL}
 
 x-app-build: &app-build
   build:
@@ -24,15 +37,15 @@ services:
     container_name: coffepay-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-coffepay}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coffepay}
-      POSTGRES_DB: ${POSTGRES_DB:-coffepay}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '${POSTGRES_PORT}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-coffepay} -d ${POSTGRES_DB:-coffepay}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -43,7 +56,7 @@ services:
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
     ports:
-      - '${REDIS_PORT:-6379}:6379'
+      - '${REDIS_PORT}:6379'
     volumes:
       - redis-data:/data
     healthcheck:
@@ -73,7 +86,7 @@ services:
       <<: *app-env
       API_GATEWAY_PORT: '3000'
       SESSION_SERVICE_URL: http://session-service:3001
-      ADMIN_API_KEY: ${ADMIN_API_KEY:-change-me-admin-dev-only}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
     ports:
       - '3000:3000'
     depends_on:
@@ -175,7 +188,7 @@ services:
     command: node services/settlement-service/dist/index.js
     environment:
       <<: *app-env
-      SETTLEMENT_INTERVAL_MS: ${SETTLEMENT_INTERVAL_MS:-3600000}
+      SETTLEMENT_INTERVAL_MS: ${SETTLEMENT_INTERVAL_MS}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -190,9 +203,9 @@ services:
       <<: *app-env
       MOCKSTORE_PORT: '4000'
       COFFEPAY_API_URL: http://api-gateway:3000
-      MOCKSTORE_API_KEY: ${MOCKSTORE_API_KEY:-cp_dev_sk_demo_0001}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
-      MOCKSTORE_WEBHOOK_SECRET: ${WEBHOOK_SIGNING_SECRET:-change-me-dev-only}
+      MOCKSTORE_API_KEY: ${MOCKSTORE_API_KEY}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      MOCKSTORE_WEBHOOK_SECRET: ${MOCKSTORE_WEBHOOK_SECRET}
     ports:
       - '4000:4000'
     depends_on:
@@ -207,7 +220,7 @@ services:
     profiles: ['ngrok']
     command: http mockstore:4000
     environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     ports:
       - '4040:4040' # ngrok inspection UI
     depends_on:

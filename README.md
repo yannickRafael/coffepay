@@ -45,8 +45,12 @@ compose levanta os 7 serviços + mockstore + datastores (T35):
 
 ```bash
 cp .env.example .env
-docker compose -f ops/docker-compose.yml up --build -d
+docker compose --env-file .env -f ops/docker-compose.yml up --build -d
 ```
+
+> O `--env-file .env` é necessário: como o compose vive em `ops/`, sem esta flag
+> ele não lê o `.env` da raiz e todas as variáveis ficam vazias. Toda a config
+> vem do `.env` (não há valores hardcoded no compose).
 
 O serviço `migrate` aplica migrações e seed (merchant demo + API key
 `cp_dev_sk_demo_0001`). Depois:
@@ -68,7 +72,7 @@ npm install
 cp .env.example .env
 
 # 3. Só os datastores (PostgreSQL 16 + Redis 7)
-docker compose -f ops/docker-compose.yml up -d postgres redis
+docker compose --env-file .env -f ops/docker-compose.yml up -d postgres redis
 
 # 4. Base de dados
 npm run db:migrate              # aplica migrações

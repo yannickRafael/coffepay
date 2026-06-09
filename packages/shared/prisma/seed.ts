@@ -11,8 +11,8 @@ async function main() {
 
   const merchant = await prisma.merchant.upsert({
     where: { nuit: '400123456' },
-    update: { status: 'ACTIVE' },
-    create: { name: 'CoffePay Demo Store', nuit: '400123456', status: 'ACTIVE' },
+    update: { name: 'TechStore', status: 'ACTIVE' },
+    create: { name: 'TechStore', nuit: '400123456', status: 'ACTIVE' },
   });
 
   // Idempotent: reset the demo key/webhook so re-seeding applies the latest hash.

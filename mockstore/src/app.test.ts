@@ -4,11 +4,15 @@ import { createApp } from './app.js';
 import type { CreateSessionFn } from './store.js';
 import { mockstoreConfig } from './config.js';
 import { clearEvents } from './events.js';
+import { clearOrders } from './orders.js';
 
 const SECRET = () => mockstoreConfig().webhookSecret;
 const noop: CreateSessionFn = async () => ({ checkoutUrl: 'x' });
 
-beforeEach(() => clearEvents());
+beforeEach(() => {
+  clearEvents();
+  clearOrders();
+});
 
 describe('GET /', () => {
   test('renders the product page with a Pay with CoffePay button', async () => {
@@ -17,7 +21,8 @@ describe('GET /', () => {
     expect(res.status).toBe(200);
     expect(res.type).toMatch(/html/);
     expect(res.text).toContain('Pay with CoffePay');
-    expect(res.text).toContain('USD');
+    expect(res.text).toContain('Dell XPS 15 Laptop');
+    expect(res.text).toContain('$299.99');
     // Popup flow: button + client fetch to /buy (no plain form submit).
     expect(res.text).toContain('id="pay-btn"');
     expect(res.text).toContain("fetch('/buy'");
@@ -38,7 +43,7 @@ describe('POST /buy', () => {
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('http://localhost:3001/checkout/abc123');
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.amountUSD).toBe(10);
+    expect(calls[0]!.amountUSD).toBe(299.99);
     expect(calls[0]!.callbackUrl).toMatch(/\/return$/);
     expect(calls[0]!.orderId).toMatch(/^order-/);
   });
@@ -54,7 +59,7 @@ describe('POST /buy', () => {
     expect(res.status).toBe(502);
     expect(res.type).toMatch(/html/);
     expect(res.text).toContain('Invalid API key');
-    expect(res.text).toContain('Voltar à loja');
+    expect(res.text).toContain('Back to Store');
   });
 });
 
@@ -82,9 +87,9 @@ describe('POST /webhooks/coffepay', () => {
 
     // The recorded event is now visible on the return page.
     const ret = await request(app).get('/return?session=sess-1&status=COMPLETED');
-    expect(ret.text).toContain('Pagamento concluído');
+    expect(ret.text).toContain('Payment Confirmed');
     expect(ret.text).toContain('635.00 MZN');
-    expect(ret.text).toContain('webhook assinado');
+    expect(ret.text).toContain('signed CoffePay webhook');
   });
 
   test('invalid signature → 401, event not recorded', async () => {
@@ -128,7 +133,7 @@ describe('GET /return', () => {
     const app = createApp({ createSession: noop });
     const res = await request(app).get('/return?session=unknown&status=FAILED');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Pagamento failed');
+    expect(res.text).toContain('Payment failed');
     expect(res.text).toContain('redirect');
   });
 });

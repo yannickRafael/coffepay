@@ -4,6 +4,7 @@ import { mockstoreConfig } from './config.js';
 import { renderProductPage, renderErrorPage, renderConfirmationPage } from './views.js';
 import { createCoffepaySession, type CreateSessionFn } from './store.js';
 import { recordEvent, getEvent, type ReceivedEvent } from './events.js';
+import { setOrder, getOrder } from './orders.js';
 
 export interface MockstoreDeps {
   createSession?: CreateSessionFn;
@@ -55,11 +56,15 @@ export function createApp(deps: MockstoreDeps = {}) {
     const sessionId = typeof req.query.session === 'string' ? req.query.session : undefined;
     const queryStatus = typeof req.query.status === 'string' ? req.query.status : 'UNKNOWN';
     const hook = sessionId ? getEvent(sessionId) : undefined;
+    const order = sessionId ? getOrder(sessionId) : undefined;
     res.type('html').send(
       renderConfirmationPage({
         status: hook?.status ?? queryStatus,
         sessionId,
-        amountMZN: hook?.amountMZN,
+        productName: order?.productName,
+        amountUSD: order?.amountUSD,
+        amountMZN: hook?.amountMZN ?? order?.amountMZN,
+        reference: hook?.paymentId ?? sessionId,
         fromWebhook: Boolean(hook),
       }),
     );
@@ -68,15 +73,25 @@ export function createApp(deps: MockstoreDeps = {}) {
   // "Pay with CoffePay": create a session. Called by fetch (Accept: json) from
   // the product page, which opens the checkout in a popup → returns JSON. Falls
   // back to a 302 redirect for a plain (no-JS) form post.
-  app.post('/buy', async (req: Request, res: Response) => {
+  app.post('/buy', express.json(), async (req: Request, res: Response) => {
     const orderId = `order-${Date.now()}`;
     const wantsJson = (req.headers.accept ?? '').includes('application/json');
+    const qtyRaw = Number((req.body as { quantity?: unknown })?.quantity ?? 1);
+    const quantity = Number.isFinite(qtyRaw) ? Math.min(Math.max(Math.trunc(qtyRaw), 1), 99) : 1;
+    const amountUSD = Number((cfg.product.priceUSD * quantity).toFixed(2));
     try {
       const session = await createSession({
         orderId,
-        amountUSD: cfg.product.priceUSD,
+        amountUSD,
         callbackUrl: `${cfg.publicBaseUrl}/return`,
       });
+      if (session.sessionId) {
+        setOrder(session.sessionId, {
+          productName: cfg.product.name,
+          amountUSD: amountUSD.toFixed(2),
+          amountMZN: session.amountMZN,
+        });
+      }
       if (wantsJson) {
         res.json({ checkoutUrl: session.checkoutUrl, sessionId: session.sessionId });
         return;

@@ -3,6 +3,8 @@ import { mockstoreConfig } from './config.js';
 export interface CreateSessionResult {
   checkoutUrl: string;
   sessionId?: string;
+  amountUSD?: string;
+  amountMZN?: string;
 }
 
 /** Injectable CoffePay client so /buy can be tested without the gateway. */

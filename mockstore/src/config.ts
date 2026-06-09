@@ -10,7 +10,14 @@ export interface MockstoreConfig {
   /** Shared HMAC secret to verify incoming CoffePay webhooks (T25/T28). */
   webhookSecret: string;
   /** Demo product. */
-  product: { name: string; priceUSD: number };
+  product: {
+    name: string;
+    category: string;
+    priceUSD: number;
+    rating: number;
+    reviews: number;
+    description: string;
+  };
 }
 
 let cached: MockstoreConfig | undefined;
@@ -27,7 +34,17 @@ export function mockstoreConfig(): MockstoreConfig {
       process.env.MOCKSTORE_WEBHOOK_SECRET ??
       process.env.WEBHOOK_SIGNING_SECRET ??
       'dev-webhook-secret',
-    product: { name: 'CoffePay Demo Mug', priceUSD: 10 },
+    product: {
+      name: 'Dell XPS 15 Laptop',
+      category: 'Laptops',
+      priceUSD: 299.99,
+      rating: 4.5,
+      reviews: 247,
+      description:
+        'The Dell XPS 15 delivers outstanding performance with a 13th Gen Intel Core i7, ' +
+        'stunning 15.6" OLED display, and all-day battery life. Perfect for professionals ' +
+        'and creatives who demand the best.',
+    },
   };
   return cached;
 }

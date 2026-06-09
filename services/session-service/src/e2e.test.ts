@@ -39,7 +39,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.merchant.delete({ where: { id: merchantId } }); // cascade
   await prisma.client.deleteMany({ where: { phoneHash: hashPhone('258841234560') } });
-  await prisma.client.deleteMany({ where: { phoneHash: hashPhone('258841234569') } });
+  await prisma.client.deleteMany({ where: { phoneHash: hashPhone('258841230000') } });
   await prisma.$disconnect();
 });
 
@@ -182,10 +182,10 @@ describe('e2e — alternate branches (T38)', () => {
     expect(session?.status).toBe(SessionStatus.PENDING);
   });
 
-  test('provider decline (msisdn ending 9) → FAILED, no ledger', async () => {
+  test('provider decline (msisdn ending 0000) → FAILED, no ledger', async () => {
     const sessionId = await newSession();
     const enqueued: PaymentJob[] = [];
-    const pay = await confirmPayment(sessionId, '258841234569', 'e2e-decline', {
+    const pay = await confirmPayment(sessionId, '258841230000', 'e2e-decline', {
       kycCheck: allowKyc,
       enqueue: async (j) => void enqueued.push(j),
     });

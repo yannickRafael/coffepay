@@ -82,7 +82,7 @@ tem montante (vem de session.amountMZN). Session.fxRateId @unique. Payment.sessi
    valida sessão+phone → **KYC ativo via HTTP** → cria Payment INITIATED →
    `transitionSession` PROCESSING → grava IdempotencyKey → **enqueuePayment**. 202.
 4. **payment-service worker** (T21) consome payment-process → `c2bPayment` (mock:
-   msisdn termina em `9` = recusa) → delega a `processResult`.
+   msisdn termina em `0000` = recusa) → delega a `processResult`.
 5. **`processResult`** (shared, T23) — autenticidade (thirdPartyReference) → atómico:
    Transaction + ProviderRequest + Payment + **LedgerEntry DEBIT/CREDIT** (T24) →
    `transitionSession` COMPLETED/FAILED → audit → **enqueueNotify** (resolve webhook).

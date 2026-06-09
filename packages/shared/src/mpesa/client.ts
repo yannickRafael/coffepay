@@ -112,9 +112,11 @@ function headers(cfg: MpesaEnv) {
 
 // ----------------------------- Mock --------------------------------
 // Deterministic so tests/dev are reproducible: a normalized MSISDN ending in
-// 9 is declined; everything else succeeds.
+// four zeros (0000) is declined; every other number succeeds. The decline
+// trigger is a distinctive suffix on purpose so real test numbers (which can
+// legitimately end in any digit) succeed by default.
 function mockC2B(p: C2BParams, msisdn: string): MpesaResult {
-  const declined = msisdn.endsWith('9');
+  const declined = msisdn.endsWith('0000');
   return normalize({
     output_ResponseCode: declined ? 'INS-996' : MPESA_SUCCESS_CODE,
     output_ResponseDesc: declined

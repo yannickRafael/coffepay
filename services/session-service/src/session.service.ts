@@ -88,6 +88,10 @@ export interface PublicSession {
   merchantName: string;
   amountUSD: string;
   amountMZN: string;
+  /** FX rate snapshot (USD→MZN) for "1 USD = X MZN". */
+  rate: string;
+  /** Service fee in MZN (already included in amountMZN, which is the total). */
+  fee: string;
   expiresAt: string;
   expired: boolean;
 }
@@ -96,7 +100,7 @@ export interface PublicSession {
 export async function getPublicSession(id: string): Promise<PublicSession> {
   const session = await prisma.session.findUnique({
     where: { id },
-    include: { merchant: { select: { name: true } } },
+    include: { merchant: { select: { name: true } }, fxRate: true },
   });
   if (!session) {
     throw new NotFoundError('Session not found', { sessionId: id });
@@ -108,6 +112,8 @@ export async function getPublicSession(id: string): Promise<PublicSession> {
     merchantName: session.merchant.name,
     amountUSD: session.amountUSD.toFixed(2),
     amountMZN: session.amountMZN.toFixed(2),
+    rate: session.fxRate ? session.fxRate.rate.toFixed(2) : '0.00',
+    fee: session.fxRate ? session.fxRate.serviceFee.toFixed(2) : '0.00',
     expiresAt: session.expiresAt.toISOString(),
     expired: session.status === SessionStatus.PENDING && session.expiresAt.getTime() <= Date.now(),
   };

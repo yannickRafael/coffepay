@@ -43,10 +43,13 @@ describe('GET /checkout/:id', () => {
     const res = await request(app).get(`/checkout/${s.id}`);
     expect(res.status).toBe(200);
     expect(res.type).toMatch(/html/);
-    expect(res.text).toContain('Confirmar pagamento');
+    // Step 1 (details) + step 2 (confirm) controls of the wizard.
+    expect(res.text).toContain('Continue');
+    expect(res.text).toContain('Confirm &amp; Pay');
+    expect(res.text).toContain('Mobile Wallet');
     expect(res.text).toContain('635.00');
     expect(res.text).toContain('MZN');
-    expect(res.text).toContain(`/sessions/${s.id}/pay`);
+    expect(res.text).toContain("'/pay'");
     expect(res.text).toContain('validate-phone');
     expect(res.text).toContain('Idempotency-Key');
   });
@@ -56,17 +59,17 @@ describe('GET /checkout/:id', () => {
     const res = await request(app).get(`/checkout/${s.id}`);
     expect(res.status).toBe(200);
     // Polls the public session endpoint and routes terminal states to /return.
-    expect(res.text).toContain(`/sessions/${s.id}`);
+    expect(res.text).toContain("fetch('/sessions/' + sid");
     expect(res.text).toContain("'/checkout/' + sid + '/return'");
     expect(res.text).toContain('startPolling');
-    expect(res.text).toContain('A aguardar confirmação');
+    expect(res.text).toContain('Awaiting Confirmation');
   });
 
   test('renders a state page for a completed session (no form)', async () => {
     const s = await makeSession(SessionStatus.COMPLETED, future());
     const res = await request(app).get(`/checkout/${s.id}`);
     expect(res.status).toBe(200);
-    expect(res.text).not.toContain('Confirmar pagamento');
+    expect(res.text).not.toContain('Confirm &amp; Pay');
     expect(res.text).toContain('COMPLETED');
   });
 
@@ -74,7 +77,7 @@ describe('GET /checkout/:id', () => {
     const s = await makeSession(SessionStatus.PENDING, past());
     const res = await request(app).get(`/checkout/${s.id}`);
     expect(res.status).toBe(200);
-    expect(res.text).not.toContain('Confirmar pagamento');
+    expect(res.text).not.toContain('Confirm &amp; Pay');
     expect(res.text).toContain('EXPIRED');
   });
 

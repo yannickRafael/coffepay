@@ -56,3 +56,6 @@ export {
 
 // BullMQ queues, DLQ and worker factory.
 export * from './queue/index.js';
+
+// Brand assets (inlined logo + palette) for the self-contained HTML pages.
+export { COFFEPAY_LOGO_DATA_URI, COFFEPAY_BRAND } from './assets/logo.js';

@@ -18,7 +18,9 @@ describe('GET /', () => {
     expect(res.type).toMatch(/html/);
     expect(res.text).toContain('Pay with CoffePay');
     expect(res.text).toContain('USD');
-    expect(res.text).toContain('action="/buy"');
+    // Popup flow: button + client fetch to /buy (no plain form submit).
+    expect(res.text).toContain('id="pay-btn"');
+    expect(res.text).toContain("fetch('/buy'");
   });
 });
 

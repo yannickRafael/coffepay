@@ -65,18 +65,29 @@ export function createApp(deps: MockstoreDeps = {}) {
     );
   });
 
-  // "Pay with CoffePay": create a session and redirect to the CoffePay checkout.
-  app.post('/buy', async (_req: Request, res: Response) => {
+  // "Pay with CoffePay": create a session. Called by fetch (Accept: json) from
+  // the product page, which opens the checkout in a popup → returns JSON. Falls
+  // back to a 302 redirect for a plain (no-JS) form post.
+  app.post('/buy', async (req: Request, res: Response) => {
     const orderId = `order-${Date.now()}`;
+    const wantsJson = (req.headers.accept ?? '').includes('application/json');
     try {
       const session = await createSession({
         orderId,
         amountUSD: cfg.product.priceUSD,
         callbackUrl: `${cfg.publicBaseUrl}/return`,
       });
+      if (wantsJson) {
+        res.json({ checkoutUrl: session.checkoutUrl, sessionId: session.sessionId });
+        return;
+      }
       res.redirect(302, session.checkoutUrl);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      if (wantsJson) {
+        res.status(502).json({ error: message });
+        return;
+      }
       res.status(502).type('html').send(renderErrorPage(message));
     }
   });

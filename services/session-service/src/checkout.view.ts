@@ -1,3 +1,4 @@
+import { COFFEPAY_LOGO_DATA_URI } from '@coffepay/shared';
 import type { PublicSession } from './session.service.js';
 
 function escapeHtml(s: string): string {
@@ -8,31 +9,50 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-// Small embedded stylesheet (no external assets, no framework) — RNF08.
+// Embedded stylesheet (no external assets, no framework) — RNF08. Palette and
+// typography mirror coffebit.com: navy/slate brand (#3f5787), light neutral
+// background, crisp white card, restrained geometric look.
 const STYLE = `
-:root { --brand:#6f4e37; --bg:#faf7f2; --ink:#1f1b16; --muted:#7a7166; --err:#b3261e; }
+:root { --brand:#3f5787; --brand-dark:#33476f; --bg:#f4f6f9; --panel:#ffffff;
+  --ink:#1a2236; --muted:#6b7488; --line:#e4e8ef; --err:#c0362c; }
 * { box-sizing: border-box; }
-body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: var(--bg); color: var(--ink); }
-main { max-width: 420px; margin: 0 auto; padding: 24px 20px 40px; }
-.brand { font-weight:700; color:var(--brand); letter-spacing:.5px; font-size:18px; }
-.card { background:#fff; border:1px solid #ece5db; border-radius:14px; padding:20px; margin-top:16px;
-  box-shadow:0 1px 2px rgba(0,0,0,.04); }
-.merchant { color:var(--muted); font-size:14px; margin:0 0 4px; }
-.amount { font-size:34px; font-weight:700; margin:8px 0 2px; }
+html, body { height:100%; }
+body { margin:0; font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg); color: var(--ink); -webkit-font-smoothing:antialiased;
+  display:flex; align-items:flex-start; justify-content:center; }
+main { width: 100%; max-width: 400px; padding: 28px 22px 40px; }
+.brand { display:flex; align-items:center; gap:10px; justify-content:center; margin-bottom:4px; }
+.brand img { width:30px; height:30px; display:block; }
+.brand span { font-weight:700; color:var(--ink); letter-spacing:-.2px; font-size:19px; }
+.brand b { color:var(--brand); font-weight:700; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  padding:24px 22px; margin-top:18px; box-shadow:0 8px 24px rgba(26,34,54,.06); }
+.merchant { color:var(--muted); font-size:13.5px; margin:0 0 6px; }
+.amount { font-size:36px; font-weight:700; margin:6px 0 2px; letter-spacing:-.5px; }
 .amount small { font-size:14px; font-weight:600; color:var(--brand); }
 .usd { color:var(--muted); font-size:13px; margin:0 0 8px; }
-label { display:block; font-size:14px; font-weight:600; margin:16px 0 6px; }
-input[type=tel] { width:100%; padding:12px; font-size:16px; border:1px solid #d8cfc2;
-  border-radius:10px; }
-input[type=tel]:focus { outline:2px solid var(--brand); border-color:var(--brand); }
+label { display:block; font-size:13.5px; font-weight:600; margin:18px 0 6px; color:var(--ink); }
+input[type=tel] { width:100%; padding:13px; font-size:16px; border:1px solid #cdd4e0;
+  border-radius:11px; background:#fbfcfe; transition:border-color .15s, box-shadow .15s; }
+input[type=tel]:focus { outline:none; border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(63,87,135,.16); }
 .error { color:var(--err); font-size:13px; min-height:18px; margin:6px 0 0; }
-button { width:100%; margin-top:16px; padding:13px; font-size:16px; font-weight:700; color:#fff;
-  background:var(--brand); border:0; border-radius:10px; cursor:pointer; }
+button { width:100%; margin-top:18px; padding:14px; font-size:15.5px; font-weight:600; color:#fff;
+  background:var(--brand); border:0; border-radius:11px; cursor:pointer; letter-spacing:.2px;
+  transition:background .15s; }
+button:hover { background:var(--brand-dark); }
 button[disabled] { opacity:.6; cursor:progress; }
-.expires { color:var(--muted); font-size:12px; margin-top:14px; text-align:center; }
-.state { font-size:18px; font-weight:700; }
+.expires { color:var(--muted); font-size:12px; margin-top:16px; text-align:center; }
+.state { font-size:19px; font-weight:700; margin:0 0 6px; }
+.secure { display:flex; align-items:center; justify-content:center; gap:6px;
+  color:var(--muted); font-size:11.5px; margin-top:18px; }
+.spinner { width:34px; height:34px; margin:6px auto 14px; border:3px solid var(--line);
+  border-top-color:var(--brand); border-radius:50%; animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
 `;
+
+// Brand header (logo + wordmark) reused on every screen, server- and client-side.
+const BRAND_HEADER = `<div class="brand"><img src="${COFFEPAY_LOGO_DATA_URI}" alt="" /><span>Coffe<b>Pay</b></span></div>`;
 
 function page(title: string, body: string, script = ''): string {
   return `<!doctype html>
@@ -65,7 +85,7 @@ export function renderCheckoutPage(
   poll: CheckoutPollOptions = DEFAULT_POLL,
 ): string {
   const sid = escapeHtml(s.sessionId);
-  const body = `<div class="brand">CoffePay</div>
+  const body = `${BRAND_HEADER}
 <div class="card" data-session-id="${sid}">
   <p class="merchant">Pagamento a <strong>${escapeHtml(s.merchantName)}</strong> · ordem ${escapeHtml(s.orderId)}</p>
   <p class="amount">${escapeHtml(s.amountMZN)} <small>MZN</small></p>
@@ -79,6 +99,7 @@ export function renderCheckoutPage(
     <button type="submit" id="submit-btn">Confirmar pagamento</button>
   </form>
   <p class="expires">Expira em ${escapeHtml(s.expiresAt)}</p>
+  <p class="secure">🔒 Pagamento seguro processado pela CoffePay</p>
 </div>`;
 
   const script = `<script>
@@ -94,14 +115,17 @@ export function renderCheckoutPage(
   var pollTimeout = ${JSON.stringify(poll.pollTimeoutMs)};
   var idemKey = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 
+  var brandHeader = ${JSON.stringify(BRAND_HEADER)};
+
   function showError(m) { err.textContent = m || ''; }
 
-  function screen(html) { main.innerHTML = '<div class="brand">CoffePay</div>' + html; }
+  function screen(html) { main.innerHTML = brandHeader + html; }
 
   // Awaiting (fig 31): tell the user to approve on their phone, then poll.
   function showAwaiting() {
     screen(
-      '<div class="card"><p class="state">A aguardar confirmação…</p>' +
+      '<div class="card"><div class="spinner"></div>' +
+      '<p class="state">A aguardar confirmação…</p>' +
       '<p class="usd">Aprove o pagamento no seu telemóvel (M-Pesa).</p>' +
       '<p class="expires" id="poll-note">A verificar o estado…</p></div>'
     );
